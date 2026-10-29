@@ -166,3 +166,5 @@ flutter:
 dependency_overrides:
   firebase_auth_web:
     path: third_party/firebase_auth_web
+  appflowy_editor:
+    path: third_party/appflowy_editor

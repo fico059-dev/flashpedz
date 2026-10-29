@@ -1,1 +1,1 @@
-FlashPedz update: 30 Oct 2026 - word-processor card editor, image occlusion in Create and Edit Flashcard, daily new card and review limits, OSCE Study/Exam modes, tutorial Exit button.
+FlashPedz update: 30 Oct 2026 (fix 2) - card editor patched so the website and iPhone app build with Flutter 3.47; word-processor card editor, image occlusion, daily limits, OSCE Study/Exam, tutorial Exit.
