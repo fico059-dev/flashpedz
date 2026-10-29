@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:flashcards/data/services/local/daily_target.dart';
+import 'package:flashcards/data/services/local/session_progress_store.dart';
 import 'package:flashcards/bloc/flashcards/session_test/session_test_bloc.dart';
 import 'package:flashcards/bloc/flashcards/session_test/session_test_event.dart';
 import 'package:flashcards/bloc/flashcards/session_test/session_test_state.dart';
@@ -42,6 +44,8 @@ class CustomSessionTestPage extends StatelessWidget {
         profileRepo: context.read<ProfileRepository>(),
         sessionRepo: context.read<CustomSessionRepository>(),
         fcpRepo: context.read<FcpRepository>(),
+        sessionProgress: context.read<SessionProgressStore>(),
+        dailyTarget: context.read<DailyTargetService>(),
       ),
       child: _View(sessionSummary: sessionSummary),
     );

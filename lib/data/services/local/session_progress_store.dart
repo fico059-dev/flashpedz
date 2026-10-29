@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flashcards/data/services/local/study_log_store.dart';
 import 'package:flashcards/domain/models/progress/study_log.dart' show dayKey;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -128,6 +130,43 @@ class SessionProgressStore {
       await _prefs.setString(_targetKey(uid, packId), '${target ?? 0}');
     } catch (_) {
       // Not saved: the default is used.
+    }
+  }
+
+  /// The new cards and reviews a day the student chose, if any.
+  Future<({int newCards, int reviews})?> dailyLimits() async {
+    try {
+      return (await _logStore?.loadCombined(timeout: syncWait))?.dailyLimits;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Chooses the daily limits for every device; null removes them.
+  Future<void> setDailyLimits(({int newCards, int reviews})? limits) async {
+    final logStore = _logStore;
+    if (logStore == null) return;
+    try {
+      await logStore.update((log) => log.setDailyLimits(limits, _now()));
+      await logStore.uploadNow();
+    } catch (_) {
+      // Not saved: sessions keep their usual size.
+    }
+  }
+
+  /// New cards and reviews already studied today, on all devices and in
+  /// every kind of session.
+  Future<({int newCards, int reviews})> studiedToday() async {
+    try {
+      final log = await _logStore?.loadCombined(timeout: syncWait);
+      final today = log?.activityOn(_now());
+      if (today == null) return (newCards: 0, reviews: 0);
+      return (
+        newCards: today.newCards,
+        reviews: max(0, today.reviews - today.newCards),
+      );
+    } catch (_) {
+      return (newCards: 0, reviews: 0);
     }
   }
 }

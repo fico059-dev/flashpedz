@@ -5,6 +5,8 @@ import 'package:flashcards/bloc/flashcards/session_test/session_test_state.dart'
 import 'package:flashcards/data/repositories/flashcards/custom_session_repository.dart';
 import 'package:flashcards/data/repositories/flashcards/fcp_repository.dart';
 import 'package:flashcards/data/repositories/users/profile_repository.dart';
+import 'package:flashcards/data/services/local/daily_target.dart';
+import 'package:flashcards/data/services/local/session_progress_store.dart';
 import 'package:flashcards/data/services/api/exceptions/document_doesnt_exist_exception.dart';
 import 'package:flashcards/domain/models/flashcards/custom_session/custom_session.dart';
 import 'package:flashcards/domain/models/flashcards/stat_record/stat_record.dart';
@@ -19,14 +21,20 @@ class SessionTestBloc extends Bloc<SessionTestEvent, SessionTestState> {
   final CustomSessionRepository _sessionRepo;
   final FcpRepository _fcpRepo;
   final ProfileRepository _profileRepo;
+  final SessionProgressStore? _sessionProgress;
+  final DailyTargetService? _dailyTarget;
 
   SessionTestBloc({
     required CustomSessionRepository sessionRepo,
     required FcpRepository fcpRepo,
     required ProfileRepository profileRepo,
+    SessionProgressStore? sessionProgress,
+    DailyTargetService? dailyTarget,
   }) : _sessionRepo = sessionRepo,
        _fcpRepo = fcpRepo,
        _profileRepo = profileRepo,
+       _sessionProgress = sessionProgress,
+       _dailyTarget = dailyTarget,
        super(SessionTestInitial()) {
     on<SessionTestDataLoaded>(_onLoaded);
     on<SessionTestNextPressed>(_onNextPressed);
@@ -373,6 +381,7 @@ class SessionTestBloc extends Bloc<SessionTestEvent, SessionTestState> {
           rating: rating,
         ),
       );
+      _countTowardsTargets(currRecord.packId);
     }
 
     final sessionId = state.session.id;
@@ -382,6 +391,23 @@ class SessionTestBloc extends Bloc<SessionTestEvent, SessionTestState> {
           ? _sessionRepo.answeredCorrect(sessionId)
           : _sessionRepo.answeredWrong(sessionId),
     );
+  }
+
+  /// A card studied here counts towards today's session of its pack (and
+  /// the exam goal's), like a card studied in the pack itself.
+  void _countTowardsTargets(String packId) {
+    final progress = _sessionProgress;
+    if (progress == null || packId.isEmpty) return;
+    unawaited(() async {
+      await progress.add('', packId);
+      try {
+        if (await _dailyTarget?.isGoalPack([packId]) ?? false) {
+          await progress.add('', 'goal');
+        }
+      } catch (_) {
+        // Only the goal's session count is missed.
+      }
+    }());
   }
 
   void _onBookmarkToggled(

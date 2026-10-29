@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flashcards/bloc/flashcards/flashcard/flashcard_event.dart';
 import 'package:flashcards/bloc/flashcards/flashcard/flashcard_state.dart';
@@ -465,10 +466,20 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
         // What the user's other devices studied today, so every device
         // continues the same session.
         await _sessionProgress.refresh();
-        // A target chosen for this pack comes first.
+        // A target chosen for this pack comes first, then the student's
+        // daily new card and review limits.
         final own = await _sessionProgress.packTarget(_uid, pack.id);
+        final limits = own == null
+            ? await _sessionProgress.dailyLimits()
+            : null;
+        int? maxNew, maxDue;
         if (own != null) {
           target = own;
+        } else if (limits != null) {
+          // What's left of today's limits, after every session today.
+          final studied = await _sessionProgress.studiedToday();
+          maxNew = max(0, limits.newCards - studied.newCards);
+          maxDue = max(0, limits.reviews - studied.reviews);
         } else if (daily != null &&
             await daily.isGoalPack([
               pack.id,
@@ -481,9 +492,21 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
         }
         _progressKey = key;
 
-        // Opening the pack again today continues the same session.
-        final done = await _sessionProgress.doneToday(_uid, key);
-        final remaining = target - done;
+        // Opening the pack again today continues the same session. Cards
+        // of its sub-packs studied on their own or in custom sessions count
+        // too.
+        var done = await _sessionProgress.doneToday(_uid, key);
+        if (key == pack.id) {
+          for (final sub in pack.subPacks) {
+            if (sub.id != pack.id) {
+              done += await _sessionProgress.doneToday(_uid, sub.id);
+            }
+          }
+        }
+        final remaining = maxNew != null && maxDue != null
+            ? maxNew + maxDue
+            : target - done;
+        if (maxNew != null) target = done + remaining;
         emit(state.copyWith(sessionDone: done, cardsPerSession: target));
         if (remaining <= 0) {
           // Today's target is done: offer to continue with more cards.
@@ -497,7 +520,16 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
           isPaid: event.pack!.isPaid,
           hasCards: state.hasCards,
           subPacks: event.pack!.subPacks,
+          maxNew: maxNew,
+          maxDue: maxDue,
         );
+        // With daily limits the session is what was found, which can be
+        // less than the limits allow.
+        if (maxNew != null) {
+          if (fcpResult case Ok<List<StatRecord>>(:final value)) {
+            emit(state.copyWith(cardsPerSession: done + value.length));
+          }
+        }
 
         // Remembers the pack as started (Started packs list).
         _saver.run(

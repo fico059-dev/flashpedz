@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flashcards/data/repositories/utils/user_claims.dart';
 import 'package:flashcards/data/services/api/dto/flashcards/custom_session/flashcard_ids/flashcard_ids_dto.dart';
 import 'package:flashcards/data/services/api/dto/flashcards/flashcard/flashcard_dto.dart';
@@ -65,6 +66,12 @@ class FcpRepository {
     required double newCardsPercentage,
     required hasCards,
     List<Pack> subPacks = const [],
+
+    /// The student's daily limits still left today. When given, the
+    /// session has up to [maxNew] new cards and [maxDue] due cards,
+    /// whatever the number of due cards.
+    int? maxNew,
+    int? maxDue,
   }) async {
     if (target < 0 || newCardsPercentage > 1 || newCardsPercentage < 0) {
       throw Exception("Invalid inputs in loadDataForStandardTest");
@@ -129,13 +136,15 @@ class FcpRepository {
     final dueList = dueRecords.take(all).toList();
     final seen = (all - unseenCount).clamp(dueList.length, all);
 
-    final [newCount, dueCount] = _calculateSeenAndNewCount(
-      all,
-      seen,
-      dueList.length,
-      normalizedTarget,
-      newCardsPercentage,
-    );
+    final [newCount, dueCount] = maxNew != null && maxDue != null
+        ? [min(max(0, maxNew), all - seen), min(max(0, maxDue), dueList.length)]
+        : _calculateSeenAndNewCount(
+            all,
+            seen,
+            dueList.length,
+            normalizedTarget,
+            newCardsPercentage,
+          );
 
     final List<StatRecord> resultList = [];
 
@@ -648,11 +657,8 @@ class FcpRepository {
       return;
     }
     _studyLog?.update(
-      (log) => log.recordReview(
-        now: DateTime.now(),
-        isNew: isNew,
-        forgot: forgot,
-      ),
+      (log) =>
+          log.recordReview(now: DateTime.now(), isNew: isNew, forgot: forgot),
     );
   }
 

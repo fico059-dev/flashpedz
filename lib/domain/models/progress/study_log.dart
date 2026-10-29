@@ -270,6 +270,10 @@ class StudyLog {
   /// studies the same number: day -> (target, when, goal signature).
   final Map<String, (int, int, int)> dayTargets;
 
+  /// The most new cards and reviews to study a day (0: no limit chosen) and
+  /// when they were chosen. The latest choice of any device counts.
+  final (int, int, int)? limits;
+
   const StudyLog({
     this.days = const {},
     this.studiedSnapshots = const {},
@@ -281,6 +285,7 @@ class StudyLog {
     this.sessions = const {},
     this.packTargets = const {},
     this.dayTargets = const {},
+    this.limits,
   });
 
   StudyLog copyWith({
@@ -294,6 +299,7 @@ class StudyLog {
     Map<String, Map<String, int>>? sessions,
     Map<String, (int, int)>? packTargets,
     Map<String, (int, int, int)>? dayTargets,
+    (int, int, int)? Function()? limits,
   }) => StudyLog(
     days: days ?? this.days,
     studiedSnapshots: studiedSnapshots ?? this.studiedSnapshots,
@@ -305,6 +311,27 @@ class StudyLog {
     sessions: sessions ?? this.sessions,
     packTargets: packTargets ?? this.packTargets,
     dayTargets: dayTargets ?? this.dayTargets,
+    limits: limits == null ? this.limits : limits(),
+  );
+
+  /// The chosen daily limits: new cards and reviews a day, or null when the
+  /// student hasn't set them (sessions then use their usual size).
+  ({int newCards, int reviews})? get dailyLimits {
+    final chosen = limits;
+    if (chosen == null || (chosen.$1 <= 0 && chosen.$2 <= 0)) return null;
+    return (newCards: max(0, chosen.$1), reviews: max(0, chosen.$2));
+  }
+
+  /// Sets the daily limits, or with null goes back to no limits.
+  StudyLog setDailyLimits(
+    ({int newCards, int reviews})? chosen,
+    DateTime now,
+  ) => copyWith(
+    limits: () => (
+      chosen?.newCards ?? 0,
+      chosen?.reviews ?? 0,
+      now.millisecondsSinceEpoch,
+    ),
   );
 
   /// Days of session counts and day targets kept.
@@ -502,7 +529,12 @@ class StudyLog {
     final packTargets = <String, (int, int)>{};
     final dayTargets = <String, (int, int, int)>{};
     final signature = goalSignature(goal ?? logs.first.goal);
+    (int, int, int)? limits;
     for (final log in logs) {
+      final chosen = log.limits;
+      if (chosen != null && (limits == null || chosen.$3 > limits.$3)) {
+        limits = chosen;
+      }
       log.sessions.forEach((day, counts) {
         final merged = sessions[day] ??= {};
         counts.forEach((key, value) {
@@ -577,6 +609,7 @@ class StudyLog {
       sessions: sessions,
       packTargets: packTargets,
       dayTargets: dayTargets,
+      limits: limits,
     );
   }
 
@@ -606,6 +639,7 @@ class StudyLog {
       'dayTargets': dayTargets.map(
         (key, value) => MapEntry(key, [value.$1, value.$2, value.$3]),
       ),
+    if (limits != null) 'limits': [limits!.$1, limits!.$2, limits!.$3],
   };
 
   factory StudyLog.decode(String? source) {
@@ -657,6 +691,13 @@ class StudyLog {
             (value[2] as num).toInt(),
           )),
         ),
+        limits: json['limits'] is List && (json['limits'] as List).length == 3
+            ? (
+                ((json['limits'] as List)[0] as num).toInt(),
+                ((json['limits'] as List)[1] as num).toInt(),
+                ((json['limits'] as List)[2] as num).toInt(),
+              )
+            : null,
       );
     } on Object {
       // A damaged log shouldn't break the app, start over.

@@ -224,4 +224,39 @@ void main() {
     expect(restored.sessionDone(day, 'goal'), 1);
     expect(restored.packTarget('neo'), 25);
   });
+
+  test('daily limits are shared and count every session and device', () async {
+    final remote = _FakeRemote();
+    final phone = device(remote);
+    final web = device(remote);
+    var now = day;
+    final phoneSession = SessionProgressStore(logStore: phone, now: () => now);
+    final webSession = SessionProgressStore(logStore: web, now: () => now);
+
+    expect(await phoneSession.dailyLimits(), isNull);
+    await phoneSession.setDailyLimits((newCards: 20, reviews: 150));
+    await webSession.refresh();
+    expect(await webSession.dailyLimits(), (newCards: 20, reviews: 150));
+
+    // 3 new cards and 2 reviews on the phone (a pack or a custom session).
+    for (var i = 0; i < 5; i++) {
+      await phone.update(
+        (log) => log.recordReview(now: now, isNew: i < 3, forgot: false),
+      );
+    }
+    await phone.uploadNow();
+    await webSession.refresh();
+    expect(await webSession.studiedToday(), (newCards: 3, reviews: 2));
+
+    // The latest choice wins; turning them off is shared too.
+    now = now.add(const Duration(minutes: 1));
+    await webSession.setDailyLimits(null);
+    await phoneSession.refresh();
+    expect(await phoneSession.dailyLimits(), isNull);
+
+    final restored = StudyLog.decode(
+      const StudyLog().setDailyLimits((newCards: 5, reviews: 0), day).encode(),
+    );
+    expect(restored.dailyLimits, (newCards: 5, reviews: 0));
+  });
 }

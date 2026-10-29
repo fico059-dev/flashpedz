@@ -1,6 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flashcards/config/router/router.dart';
 import 'package:flashcards/ui/constants/styles.dart';
+import 'package:flashcards/ui/dialogs/flashcard/daily_limits_dialog.dart';
 import 'package:flashcards/ui/widgets/profile/profile_menu_widget.dart';
 import 'package:flashcards/ui/widgets/core/desktop_layout.dart';
 import 'package:flutter/material.dart';
@@ -32,6 +33,11 @@ class FlashcardSettingsPage extends StatelessWidget {
                 onPress: () => context.router.navigate(
                   const MainTabRoute(children: [LearningProgressRoute()]),
                 ),
+              ),
+              ProfileMenuWidget(
+                title: "Daily New Cards & Reviews",
+                icon: Icons.tune,
+                onPress: () => showDailyLimitsDialog(context),
               ),
               ProfileMenuWidget(
                 title: "Manage Ignored Flashcards",
