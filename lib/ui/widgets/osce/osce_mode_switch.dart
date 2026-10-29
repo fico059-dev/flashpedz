@@ -33,7 +33,7 @@ class OsceModeSwitch extends StatelessWidget {
             ButtonSegment(
               value: OsceMode.learning,
               icon: Icon(Icons.school_outlined),
-              label: Text('Learning'),
+              label: Text('Study'),
             ),
             ButtonSegment(
               value: OsceMode.exam,
@@ -49,10 +49,10 @@ class OsceModeSwitch extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             mode == OsceMode.learning
-                ? 'Learning: see the answers after each question, and again '
-                      'at the end.'
-                : 'Exam: answer every question first, the answers are shown '
-                      'at the end.',
+                ? 'Study: each question shows its answer checklist right away, '
+                      'to learn it. The full checklist comes again at the end.'
+                : 'Exam: answer every question first; the answers and the '
+                      'checklist are shown only at the end.',
             style: Theme.of(context).textTheme.bodySmall,
             textAlign: TextAlign.center,
           ),
@@ -62,36 +62,22 @@ class OsceModeSwitch extends StatelessWidget {
   }
 }
 
-/// In Learning mode, the current question's answers: hidden behind a
-/// button until the student has answered, then its checklist to tick.
+/// In Study mode, the current question's answer checklist, shown right
+/// away to learn it (and tick what was covered).
 class OsceLearningAnswer extends StatelessWidget {
   const OsceLearningAnswer({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final view = context.select<OsceBloc, (OsceMode, int, bool)?>((bloc) {
+    final view = context.select<OsceBloc, (OsceMode, int)?>((bloc) {
       final state = bloc.state;
       if (state is! OsceLoaded) return null;
-      return (
-        state.mode,
-        state.currentQuestionIndex,
-        state.revealedQuestions[state.currentQuestion.id] == true,
-      );
+      return (state.mode, state.currentQuestionIndex);
     });
     if (view == null || view.$1 != OsceMode.learning) {
       return const SizedBox.shrink();
     }
-    final (_, index, revealed) = view;
-    if (!revealed) {
-      return Center(
-        child: OutlinedButton.icon(
-          onPressed: () =>
-              context.read<OsceBloc>().add(OsceCurrentQuestionRevealed()),
-          icon: const Icon(Icons.visibility_outlined),
-          label: const Text('Show answer'),
-        ),
-      );
-    }
+    final index = view.$2;
     final question = context.select<OsceBloc, Question>(
       (bloc) => (bloc.state as OsceLoaded).osce.questions[index],
     );
@@ -99,7 +85,7 @@ class OsceLearningAnswer extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Answer: tick what you covered',
+          'Answer checklist: tick what you covered',
           style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: 8),

@@ -140,7 +140,7 @@ void main() {
     expect((bloc.state as OsceLoaded).reviewingChecklist, isFalse);
   });
 
-  testWidgets('Learning mode shows the answer after each question', (
+  testWidgets('Study mode shows each answer at once, Exam mode at the end', (
     tester,
   ) async {
     final bloc = OsceBloc(
@@ -163,16 +163,13 @@ void main() {
         ),
       ),
     );
-    // Exam mode: no answer while answering.
-    expect(find.text('Show answer'), findsNothing);
-
-    await tester.tap(find.text('Learning'));
-    await tester.pumpAndSettle();
-    expect((bloc.state as OsceLoaded).mode, OsceMode.learning);
+    // Exam mode: no answers while answering.
     expect(find.text('Asks about onset'), findsNothing);
 
-    await tester.tap(find.text('Show answer'));
+    await tester.tap(find.text('Study'));
     await tester.pumpAndSettle();
+    expect((bloc.state as OsceLoaded).mode, OsceMode.learning);
+    // The checklist shows straight away and can be ticked.
     expect(find.text('Asks about onset'), findsOneWidget);
     await tester.tap(find.text('Asks about onset'));
     await tester.pumpAndSettle();
@@ -181,15 +178,15 @@ void main() {
       isTrue,
     );
 
-    // The next question's answer starts hidden again.
+    // The next question shows its own checklist.
     bloc.add(NextQuestionRequested());
     await tester.pumpAndSettle();
-    expect(find.text('Show answer'), findsOneWidget);
-    expect(find.text('Checks pulse'), findsNothing);
+    expect(find.text('Checks pulse'), findsOneWidget);
+    expect(find.text('Asks about onset'), findsNothing);
 
     // Back to Exam mode hides the answers.
     await tester.tap(find.text('Exam'));
     await tester.pumpAndSettle();
-    expect(find.text('Show answer'), findsNothing);
+    expect(find.text('Checks pulse'), findsNothing);
   });
 }
