@@ -33,6 +33,12 @@ class _TutorialPageTemplateState extends State<TutorialPageTemplate> {
   final PageController _controller = PageController();
   int _currentPage = 0;
 
+  /// Closes the tutorial; it counts as seen, so it doesn't open again.
+  void _finish() {
+    widget.onFinish?.call();
+    context.router.pop();
+  }
+
   void _goToPage(int index) {
     if (index >= 0 && index < widget.slides.length) {
       _controller.animateToPage(
@@ -51,6 +57,18 @@ class _TutorialPageTemplateState extends State<TutorialPageTemplate> {
         child: SafeArea(
           child: Column(
             children: [
+              // Exit at any time, not only after the last slide.
+              Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                  child: TextButton.icon(
+                    onPressed: _finish,
+                    icon: const Icon(Icons.close),
+                    label: const Text("Exit"),
+                  ),
+                ),
+              ),
               // PageView with slides
               Expanded(
                 child: PageView.builder(
@@ -140,10 +158,7 @@ class _TutorialPageTemplateState extends State<TutorialPageTemplate> {
                     FilledButton(
                       onPressed: _currentPage < widget.slides.length - 1
                           ? () => _goToPage(_currentPage + 1)
-                          : () {
-                              widget.onFinish?.call();
-                              context.router.pop();
-                            },
+                          : _finish,
                       child: Text(
                         _currentPage == widget.slides.length - 1
                             ? "Finish"
