@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flashcards/data/remote/cloud_function_service.dart';
 import 'package:flashcards/data/utils/image_compression.dart';
 import 'package:flashcards/domain/models/flashcards/card_markup/card_markup.dart';
+import 'package:flashcards/ui/widgets/flashcard/card_content.dart';
 import 'package:flashcards/utils/firebase_error_mapper.dart';
 import 'package:flutter/material.dart';
 
@@ -57,8 +59,99 @@ void insertBlock(TextEditingController controller, String block) {
   );
 }
 
+final _bulletPrefix = RegExp(r'^\s*[•\-\*]\s+');
+final _numberPrefix = RegExp(r'^\s*\d+[.)]\s+');
+
+/// Turns the selected lines (or the cursor's line) into a bulleted or
+/// numbered list, or back into plain lines when they already are one.
+void toggleList(TextEditingController controller, {required bool numbered}) {
+  final text = controller.text;
+  var selection = controller.selection;
+  if (!selection.isValid) {
+    selection = TextSelection.collapsed(offset: text.length);
+  }
+  // Whole lines touched by the selection.
+  final start = text.lastIndexOf('\n', max(0, selection.start - 1)) + 1;
+  final startAt = selection.start == 0 ? 0 : start;
+  var end = text.indexOf('\n', selection.end);
+  if (end == -1) end = text.length;
+  final lines = text.substring(startAt, end).split('\n');
+
+  final pattern = numbered ? _numberPrefix : _bulletPrefix;
+  final already = lines
+      .where((l) => l.trim().isNotEmpty)
+      .every((l) => pattern.hasMatch(l));
+  var number = 0;
+  final changed = [
+    for (final line in lines)
+      if (line.trim().isEmpty)
+        line
+      else if (already)
+        line.replaceFirst(pattern, '')
+      else
+        '${numbered ? '${++number}.' : '•'} '
+            '${line.replaceFirst(_bulletPrefix, '').replaceFirst(_numberPrefix, '')}',
+  ].join('\n');
+
+  controller.value = TextEditingValue(
+    text: text.substring(0, startAt) + changed + text.substring(end),
+    selection: TextSelection.collapsed(offset: startAt + changed.length),
+  );
+}
+
+/// The card text as it will look, under the box it's typed in, so tables,
+/// lists and formatting can be checked while writing.
+class CardMarkupPreview extends StatelessWidget {
+  final TextEditingController controller;
+
+  const CardMarkupPreview({super.key, required this.controller});
+
+  static bool _worthShowing(String text) =>
+      hasCardMarkup(text) ||
+      text
+          .split('\n')
+          .any((l) => _bulletPrefix.hasMatch(l) || _numberPrefix.hasMatch(l));
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        final text = controller.text;
+        if (text.trim().isEmpty || !_worthShowing(text)) {
+          return const SizedBox.shrink();
+        }
+        final colors = Theme.of(context).colorScheme;
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(top: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: colors.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Preview',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: colors.primary),
+              ),
+              const SizedBox(height: 6),
+              CardContent(text),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Formatting buttons shown above a card's question or answer box: bold,
-/// underline, text size, table and image.
+/// underline, text size, lists, table and image.
 class CardFormatToolbar extends StatefulWidget {
   final TextEditingController controller;
 
@@ -121,13 +214,15 @@ class _CardFormatToolbarState extends State<CardFormatToolbar> {
             "**bold**\n"
             "__underline__\n"
             "[size=22]bigger text[/size]  (sizes 8–48)\n"
-            "![image](link)  an image; add as many as you like\n\n"
+            "![image](link)  an image; add as many as you like\n"
+            "• a bulleted line,  1. a numbered line (list buttons)\n\n"
             "Tables: each row on its own line between | bars. The line of "
             "dashes under the first row makes it a header.\n"
             "| Drug | Dose |\n"
             "|------|------|\n"
             "| Amox | 50 mg/kg |\n\n"
-            "Cloze {curly braces} still work inside formatting.",
+            "Cloze {curly braces} still work inside formatting. A preview "
+            "under the box shows how the card will look.",
           ),
         ),
         actions: [
@@ -167,6 +262,16 @@ class _CardFormatToolbarState extends State<CardFormatToolbar> {
             PopupMenuItem(value: 28, child: Text("Very large (28)")),
             PopupMenuItem(value: 36, child: Text("Huge (36)")),
           ],
+        ),
+        IconButton(
+          tooltip: "Bulleted list",
+          icon: const Icon(Icons.format_list_bulleted),
+          onPressed: () => toggleList(_controller, numbered: false),
+        ),
+        IconButton(
+          tooltip: "Numbered list",
+          icon: const Icon(Icons.format_list_numbered),
+          onPressed: () => toggleList(_controller, numbered: true),
         ),
         IconButton(
           tooltip: "Insert table",

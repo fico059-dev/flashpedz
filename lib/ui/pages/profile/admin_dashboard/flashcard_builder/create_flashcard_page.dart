@@ -211,6 +211,7 @@ class _ViewState extends State<_View> {
                           : null,
                       labelText: "Question",
                     ),
+                    CardMarkupPreview(controller: _questionCont),
 
                     SizedBox(),
 
@@ -241,6 +242,7 @@ class _ViewState extends State<_View> {
                           : null,
                       labelText: "Answer",
                     ),
+                    CardMarkupPreview(controller: _answerCont),
 
                     SizedBox(height: 10),
                     BlocBuilder<CreateFlashcardCubit, CreateFlashcardState>(

@@ -56,11 +56,61 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(body: CardContent('Cause of ______ ?')),
-      ),
+      const MaterialApp(home: Scaffold(body: CardContent('Cause of ______ ?'))),
     );
     expect(find.byType(Table), findsNothing);
     expect(find.byType(SelectableText), findsOneWidget);
+  });
+
+  group('lists', () {
+    test('bullets the selected lines, then removes them again', () {
+      final c = TextEditingController(text: 'Causes:\nSepsis\nHypoxia\nEnd');
+      c.selection = const TextSelection(baseOffset: 9, extentOffset: 20);
+      toggleList(c, numbered: false);
+      expect(c.text, 'Causes:\n• Sepsis\n• Hypoxia\nEnd');
+      c.selection = const TextSelection(baseOffset: 9, extentOffset: 22);
+      toggleList(c, numbered: false);
+      expect(c.text, 'Causes:\nSepsis\nHypoxia\nEnd');
+    });
+
+    test('numbers lines in order and replaces bullets', () {
+      final c = TextEditingController(
+        text: '• Airway\n• Breathing\n\nCirculation',
+      );
+      c.selection = TextSelection(baseOffset: 0, extentOffset: c.text.length);
+      toggleList(c, numbered: true);
+      expect(c.text, '1. Airway\n2. Breathing\n\n3. Circulation');
+    });
+
+    test('with no selection, the cursor line becomes a list item', () {
+      final c = TextEditingController(text: 'First\nSecond');
+      c.selection = const TextSelection.collapsed(offset: 8);
+      toggleList(c, numbered: false);
+      expect(c.text, 'First\n• Second');
+    });
+  });
+
+  testWidgets('the preview shows a table while it is being written', (
+    tester,
+  ) async {
+    final c = TextEditingController(text: 'Plain text');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(child: CardMarkupPreview(controller: c)),
+        ),
+      ),
+    );
+    expect(find.text('Preview'), findsNothing);
+
+    c.text = '| Drug | Dose |\n|---|---|\n| Amox | 50 mg/kg |';
+    await tester.pump();
+    expect(find.text('Preview'), findsOneWidget);
+    expect(find.byType(Table), findsOneWidget);
+    expect(find.textContaining('Amox'), findsOneWidget);
+
+    c.text = '• one\n• two';
+    await tester.pump();
+    expect(find.text('Preview'), findsOneWidget);
   });
 }

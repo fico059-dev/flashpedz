@@ -205,6 +205,7 @@ class _UpdateFormState extends State<_UpdateForm> {
                                   labelText: 'Question',
                                   textEditingController: _questionCont,
                                 ),
+                                CardMarkupPreview(controller: _questionCont),
 
                                 SizedBox(),
 
@@ -245,6 +246,7 @@ class _UpdateFormState extends State<_UpdateForm> {
                                   labelText: 'Answer',
                                   textEditingController: _answerCont,
                                 ),
+                                CardMarkupPreview(controller: _answerCont),
                                 SizedBox(),
 
                                 BlocBuilder<
