@@ -36,13 +36,39 @@ class CardContent extends StatelessWidget {
       children: [
         for (final block in parseCardMarkup(text))
           switch (block) {
-            TextBlock(:final text) => HighlightableText(
-              text.plainText,
-              runs: text.runs,
-              style: style,
-              textAlign: textAlign,
-              target: target,
+            TextBlock(:final text, style: final line) => _StyledParagraph(
+              line: line,
+              child: HighlightableText(
+                text.plainText,
+                runs: text.runs,
+                style: switch (line) {
+                  LineStyle.h1 => (style ?? const TextStyle()).copyWith(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  LineStyle.h2 => (style ?? const TextStyle()).copyWith(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  LineStyle.h3 => (style ?? const TextStyle()).copyWith(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  LineStyle.quote => (style ?? const TextStyle()).copyWith(
+                    fontStyle: FontStyle.italic,
+                  ),
+                  _ => style,
+                },
+                textAlign: switch (line) {
+                  LineStyle.center => TextAlign.center,
+                  LineStyle.right => TextAlign.right,
+                  LineStyle.justify => TextAlign.justify,
+                  _ => textAlign,
+                },
+                target: target,
+              ),
             ),
+            DividerBlock() => const Divider(height: 8),
             ImageBlock(:final url) => _CardImage(url: url),
             OcclusionBlock() => OcclusionImage(block: block),
             TableBlock() => _CardTable(
@@ -158,12 +184,7 @@ class _CardTable extends StatelessWidget {
                     runs: table.hasHeader && r == 0
                         ? [
                             for (final run in cell.runs)
-                              StyledRun(
-                                run.text,
-                                bold: true,
-                                underline: run.underline,
-                                size: run.size,
-                              ),
+                              run.copyWith(bold: true),
                           ]
                         : cell.runs,
                     style: cellStyle,
@@ -320,4 +341,34 @@ class OcclusionPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(OcclusionPainter old) => old.block != block;
+}
+
+/// A paragraph's frame: a bar beside quotes, full width when aligned.
+class _StyledParagraph extends StatelessWidget {
+  final LineStyle line;
+  final Widget child;
+
+  const _StyledParagraph({required this.line, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (line) {
+      LineStyle.quote => Container(
+        padding: const EdgeInsets.only(left: 12),
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(
+              color: Theme.of(context).colorScheme.primary,
+              width: 3,
+            ),
+          ),
+        ),
+        child: child,
+      ),
+      LineStyle.center ||
+      LineStyle.right ||
+      LineStyle.justify => SizedBox(width: double.infinity, child: child),
+      _ => child,
+    };
+  }
 }

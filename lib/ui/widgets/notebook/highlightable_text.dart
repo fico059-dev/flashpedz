@@ -175,10 +175,29 @@ class _HighlightableTextState extends State<HighlightableText> {
           text: text.substring(start, end),
           style: TextStyle(
             fontWeight: run.bold ? FontWeight.w700 : null,
-            decoration: run.underline ? TextDecoration.underline : null,
-            fontSize: run.size,
-            backgroundColor: highlighted ? highlightBackground : null,
-            color: highlighted ? highlightForeground : null,
+            fontStyle: run.italic ? FontStyle.italic : null,
+            decoration: TextDecoration.combine([
+              if (run.underline) TextDecoration.underline,
+              if (run.strike) TextDecoration.lineThrough,
+            ]),
+            fontSize: run.script == Script.normal
+                ? run.size
+                : (run.size ?? widget.style?.fontSize ?? 16) * 0.7,
+            fontFeatures: switch (run.script) {
+              Script.superscript => const [FontFeature.superscripts()],
+              Script.subscript => const [FontFeature.subscripts()],
+              Script.normal => null,
+            },
+            backgroundColor: highlighted
+                ? highlightBackground
+                : run.background == null
+                ? null
+                : Color(run.background!),
+            color: highlighted
+                ? highlightForeground
+                : run.color == null
+                ? null
+                : Color(run.color!),
           ),
         ),
       );

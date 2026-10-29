@@ -7,14 +7,14 @@ import 'package:flashcards/data/repositories/flashcards/tag_repository.dart';
 import 'package:flashcards/domain/models/flashcards/flashcard/flashcard.dart';
 import 'package:flashcards/ui/constants/styles.dart';
 import 'package:flashcards/ui/widgets/core/bloc_buttons/bloc_button.dart';
-import 'package:flashcards/ui/widgets/core/bloc_text_field.dart';
 import 'package:flashcards/ui/widgets/core/custom_drag_handle.dart';
 import 'package:flashcards/ui/widgets/core/images/image_picker_button.dart';
 import 'package:flashcards/ui/widgets/core/loading_overlay_listener.dart';
-import 'package:flashcards/ui/widgets/profile/admin_dashboard/cloze_context_menu_builder.dart';
 import 'package:flashcards/ui/widgets/profile/admin_dashboard/flashcard_builder/tag_input.dart';
 import 'package:flashcards/utils/firebase_error_mapper.dart';
-import 'package:flashcards/ui/widgets/profile/admin_dashboard/flashcard_builder/card_format_toolbar.dart';
+import 'package:flashcards/domain/models/flashcards/card_markup/card_markup.dart';
+import 'package:flashcards/ui/pages/profile/admin_dashboard/flashcard_builder/image_occlusion_page.dart';
+import 'package:flashcards/ui/widgets/editor/rich_card_editor_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -73,6 +73,48 @@ class _UpdateFormState extends State<_UpdateForm> {
     _questionCont.dispose();
     _answerCont.dispose();
     super.dispose();
+  }
+
+  /// Image occlusion for this card: edits its boxes, or turns it into an
+  /// image-occlusion card with a new image.
+  Future<void> _editOcclusion() async {
+    final existing = [
+      ...parseCardMarkup(_questionCont.text),
+    ].whereType<OcclusionBlock>().firstOrNull;
+    final result = await openOcclusionForCard(context, existing: existing);
+    if (result == null || !mounted) return;
+    String put(String text, String line, {required bool first}) {
+      final lines = text.split('\n');
+      final at = lines.indexWhere(
+        (l) => parseCardMarkup(l).firstOrNull is OcclusionBlock,
+      );
+      if (at >= 0) {
+        lines[at] = line;
+        return lines.join('\n');
+      }
+      if (text.trim().isEmpty) return line;
+      return first ? '$line\n$text' : '$text\n$line';
+    }
+
+    _questionCont.text = put(
+      _questionCont.text,
+      occlusionLine(
+        url: result.url,
+        masks: result.masks,
+        target: result.target,
+      ),
+      first: false,
+    );
+    _answerCont.text = put(
+      _answerCont.text,
+      occlusionLine(
+        url: result.url,
+        masks: result.masks,
+        target: result.target,
+        revealed: true,
+      ),
+      first: true,
+    );
   }
 
   void _onFcPreview() {
@@ -184,28 +226,36 @@ class _UpdateFormState extends State<_UpdateForm> {
                                     ),
                                   ],
                                 ),
-                                CardFormatToolbar(controller: _questionCont),
-                                BlocTextField<
+                                BlocSelector<
                                   UpdateFlashcardCubit,
-                                  UpdateFlashcardState
+                                  UpdateFlashcardState,
+                                  String?
                                 >(
-                                  contextMenuBuilder:
-                                      (context, editableTextState) =>
-                                          clozeContextMenuBuilder(
-                                            context,
-                                            editableTextState,
-                                            _questionCont,
-                                          ),
-                                  minLines: 3,
-                                  maxLines: 10,
-                                  errorSelector: (state) =>
+                                  selector: (state) =>
                                       state.status.isFormInvalid
                                       ? state.formErrors['question']
                                       : null,
-                                  labelText: 'Question',
-                                  textEditingController: _questionCont,
+                                  builder: (context, error) =>
+                                      RichCardEditorLoader(
+                                        controller: _questionCont,
+                                        label: 'Question',
+                                        errorText: error,
+                                        extraActions: [
+                                          IconButton(
+                                            tooltip:
+                                                'Image occlusion: hide parts of '
+                                                'an image',
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            iconSize: 20,
+                                            onPressed: _editOcclusion,
+                                            icon: const Icon(
+                                              Icons.layers_outlined,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                 ),
-                                CardMarkupPreview(controller: _questionCont),
 
                                 SizedBox(),
 
@@ -232,21 +282,22 @@ class _UpdateFormState extends State<_UpdateForm> {
                                     ),
                                   ],
                                 ),
-                                CardFormatToolbar(controller: _answerCont),
-                                BlocTextField<
+                                BlocSelector<
                                   UpdateFlashcardCubit,
-                                  UpdateFlashcardState
+                                  UpdateFlashcardState,
+                                  String?
                                 >(
-                                  minLines: 3,
-                                  maxLines: 10,
-                                  errorSelector: (state) =>
+                                  selector: (state) =>
                                       state.status.isFormInvalid
                                       ? state.formErrors['answer']
                                       : null,
-                                  labelText: 'Answer',
-                                  textEditingController: _answerCont,
+                                  builder: (context, error) =>
+                                      RichCardEditorLoader(
+                                        controller: _answerCont,
+                                        label: 'Answer',
+                                        errorText: error,
+                                      ),
                                 ),
-                                CardMarkupPreview(controller: _answerCont),
                                 SizedBox(),
 
                                 BlocBuilder<

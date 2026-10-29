@@ -30,16 +30,40 @@ Future<int?> openImageOcclusionEditor(BuildContext context, AdminPack pack) {
   );
 }
 
+/// Opens the image-occlusion editor for one card being edited: its image
+/// and boxes ([existing]), or a new image. Returns the image, the boxes and
+/// the box this card asks about.
+Future<OcclusionBlock?> openOcclusionForCard(
+  BuildContext context, {
+  OcclusionBlock? existing,
+}) {
+  return Navigator.of(context).push<OcclusionBlock>(
+    MaterialPageRoute(builder: (_) => ImageOcclusionPage(editing: existing)),
+  );
+}
+
 /// Image occlusion, like in Anki: pick an image, draw boxes over the parts
 /// to learn, and a card is made for each box.
+///
+/// With [pack] the cards are made in that pack. Without one it edits a
+/// single card: the selected box is the one the card asks about, and the
+/// page returns the result instead.
 class ImageOcclusionPage extends StatefulWidget {
-  final AdminPack pack;
+  final AdminPack? pack;
+
+  /// The card's image and boxes, when editing a card.
+  final OcclusionBlock? editing;
 
   /// An image to start with (tests and screenshots).
   @visibleForTesting
   final (Uint8List, Size)? initialImage;
 
-  const ImageOcclusionPage({super.key, required this.pack, this.initialImage});
+  const ImageOcclusionPage({
+    super.key,
+    this.pack,
+    this.editing,
+    this.initialImage,
+  });
 
   @override
   State<ImageOcclusionPage> createState() => _ImageOcclusionPageState();
@@ -47,7 +71,15 @@ class ImageOcclusionPage extends StatefulWidget {
 
 class _ImageOcclusionPageState extends State<ImageOcclusionPage> {
   Uint8List? _image;
+
+  /// The card's image online, when editing a card and no new image was
+  /// picked.
+  String? _imageUrl;
   Size? _imageSize;
+  ImageStream? _sizeStream;
+  ImageStreamListener? _sizeListener;
+
+  bool get _editingCard => widget.pack == null;
   final _masks = <OcclusionMask>[];
   int? _selected;
   OcclusionMask? _drawing;
@@ -62,10 +94,45 @@ class _ImageOcclusionPageState extends State<ImageOcclusionPage> {
     super.initState();
     _image = widget.initialImage?.$1;
     _imageSize = widget.initialImage?.$2;
+    final editing = widget.editing;
+    if (editing != null && _image == null) {
+      _imageUrl = editing.url;
+      _masks.addAll(editing.masks);
+      _selected = editing.masks.isEmpty
+          ? null
+          : editing.target.clamp(0, editing.masks.length - 1);
+      _loadSize(editing.url);
+    }
+  }
+
+  /// The online image's size, to draw its boxes in the right places.
+  void _loadSize(String url) {
+    final stream = NetworkImage(url).resolve(ImageConfiguration.empty);
+    final listener = ImageStreamListener(
+      (info, _) {
+        if (!mounted) return;
+        setState(
+          () => _imageSize = Size(
+            info.image.width.toDouble(),
+            info.image.height.toDouble(),
+          ),
+        );
+      },
+      onError: (error, _) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("The card's image couldn't be loaded.")),
+        );
+      },
+    );
+    stream.addListener(listener);
+    _sizeStream = stream;
+    _sizeListener = listener;
   }
 
   @override
   void dispose() {
+    if (_sizeListener != null) _sizeStream?.removeListener(_sizeListener!);
     _prompt.dispose();
     _extra.dispose();
     super.dispose();
@@ -88,6 +155,7 @@ class _ImageOcclusionPageState extends State<ImageOcclusionPage> {
       if (!mounted) return;
       setState(() {
         _image = jpeg;
+        _imageUrl = null;
         _imageSize = Size(
           frame.image.width.toDouble(),
           frame.image.height.toDouble(),
@@ -155,7 +223,39 @@ class _ImageOcclusionPageState extends State<ImageOcclusionPage> {
     });
   }
 
+  /// Editing a card: gives back the image, the boxes and the asked box.
+  Future<void> _useForCard() async {
+    final target = _selected;
+    if (_masks.isEmpty || target == null) return;
+    setState(() => _saving = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      final image = _image;
+      final url = image != null
+          ? await CloudFunctionService().uploadCardImage(base64Encode(image))
+          : _imageUrl!;
+      navigator.pop(
+        OcclusionBlock(
+          url: url,
+          masks: List.of(_masks),
+          target: target,
+          revealed: false,
+        ),
+      );
+    } on Exception catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Image not saved: ${extractErrorMessage(error)}'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _create() async {
+    if (_editingCard) return _useForCard();
     final image = _image;
     if (image == null || _masks.isEmpty) return;
     setState(() => _saving = true);
@@ -169,7 +269,7 @@ class _ImageOcclusionPageState extends State<ImageOcclusionPage> {
       final result = await context
           .read<CreateFlashcardCubit>()
           .createOcclusionCards(
-            packId: widget.pack.packId,
+            packId: widget.pack!.packId,
             imageUrl: url,
             masks: List.of(_masks),
             prompt: _prompt.text,
@@ -216,7 +316,9 @@ class _ImageOcclusionPageState extends State<ImageOcclusionPage> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.memory(_image!, fit: BoxFit.fill),
+              _image != null
+                  ? Image.memory(_image!, fit: BoxFit.fill)
+                  : Image.network(_imageUrl!, fit: BoxFit.fill),
               CustomPaint(
                 painter: _EditorPainter(
                   masks: _masks,
@@ -233,7 +335,13 @@ class _ImageOcclusionPageState extends State<ImageOcclusionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = _image != null;
+    final hasImage = _image != null || _imageUrl != null;
+    if (hasImage && _imageSize == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Image occlusion')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
     final count = _masks.length;
     return Scaffold(
       appBar: AppBar(
@@ -328,36 +436,53 @@ class _ImageOcclusionPageState extends State<ImageOcclusionPage> {
                       ],
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _prompt,
-                            decoration: const InputDecoration(
-                              labelText: 'Question text (optional)',
-                              isDense: true,
+                  if (_editingCard)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                      child: Text(
+                        _selected == null
+                            ? 'Tap the box this card should ask about.'
+                            : 'This card asks about box ${_selected! + 1} '
+                                  '(orange); the others stay hidden.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _prompt,
+                              decoration: const InputDecoration(
+                                labelText: 'Question text (optional)',
+                                isDense: true,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            controller: _extra,
-                            decoration: const InputDecoration(
-                              labelText: 'Extra on the answer (optional)',
-                              isDense: true,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _extra,
+                              decoration: const InputDecoration(
+                                labelText: 'Extra on the answer (optional)',
+                                isDense: true,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: FilledButton.icon(
-                      onPressed: count == 0 || _saving ? null : _create,
+                      onPressed:
+                          count == 0 ||
+                              _saving ||
+                              (_editingCard && _selected == null)
+                          ? null
+                          : _create,
                       icon: _saving
                           ? const SizedBox.square(
                               dimension: 18,
@@ -367,6 +492,8 @@ class _ImageOcclusionPageState extends State<ImageOcclusionPage> {
                       label: Text(
                         count == 0
                             ? 'Draw at least one box'
+                            : _editingCard
+                            ? 'Use for this card'
                             : 'Make $count card${count == 1 ? '' : 's'}',
                       ),
                     ),

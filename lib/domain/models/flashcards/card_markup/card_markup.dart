@@ -9,37 +9,114 @@
 /// Curly braces are left alone: they mark cloze deletions.
 library;
 
+/// Raised or lowered text.
+enum Script { normal, superscript, subscript }
+
 /// A stretch of text with one style.
 class StyledRun {
   final String text;
   final bool bold;
   final bool underline;
   final double? size;
+  final bool italic;
+  final bool strike;
+  final Script script;
+
+  /// Text and background colours as 0xAARRGGBB, if any.
+  final int? color;
+  final int? background;
 
   const StyledRun(
     this.text, {
     this.bold = false,
     this.underline = false,
     this.size,
+    this.italic = false,
+    this.strike = false,
+    this.script = Script.normal,
+    this.color,
+    this.background,
   });
 
-  bool get isPlain => !bold && !underline && size == null;
+  bool get isPlain =>
+      !bold &&
+      !underline &&
+      size == null &&
+      !italic &&
+      !strike &&
+      script == Script.normal &&
+      color == null &&
+      background == null;
+
+  /// The same style with other text.
+  StyledRun withText(String text) => StyledRun(
+    text,
+    bold: bold,
+    underline: underline,
+    size: size,
+    italic: italic,
+    strike: strike,
+    script: script,
+    color: color,
+    background: background,
+  );
+
+  StyledRun copyWith({
+    bool? bold,
+    bool? underline,
+    double? size,
+    bool? italic,
+    bool? strike,
+    Script? script,
+    int? color,
+    int? background,
+  }) => StyledRun(
+    text,
+    bold: bold ?? this.bold,
+    underline: underline ?? this.underline,
+    size: size ?? this.size,
+    italic: italic ?? this.italic,
+    strike: strike ?? this.strike,
+    script: script ?? this.script,
+    color: color ?? this.color,
+    background: background ?? this.background,
+  );
+
+  bool sameStyle(StyledRun other) =>
+      other.bold == bold &&
+      other.underline == underline &&
+      other.size == size &&
+      other.italic == italic &&
+      other.strike == strike &&
+      other.script == script &&
+      other.color == color &&
+      other.background == background;
 
   @override
   bool operator ==(Object other) =>
-      other is StyledRun &&
-      other.text == text &&
-      other.bold == bold &&
-      other.underline == underline &&
-      other.size == size;
+      other is StyledRun && other.text == text && sameStyle(other);
 
   @override
-  int get hashCode => Object.hash(text, bold, underline, size);
+  int get hashCode => Object.hash(
+    text,
+    bold,
+    underline,
+    size,
+    italic,
+    strike,
+    script,
+    color,
+    background,
+  );
 
   @override
   String toString() =>
       'StyledRun("$text"${bold ? ', bold' : ''}'
-      '${underline ? ', underline' : ''}${size != null ? ', size: $size' : ''})';
+      '${underline ? ', underline' : ''}${size != null ? ', size: $size' : ''}'
+      '${italic ? ', italic' : ''}${strike ? ', strike' : ''}'
+      '${script != Script.normal ? ', $script' : ''}'
+      '${color != null ? ', color: ${color!.toRadixString(16)}' : ''}'
+      '${background != null ? ', bg: ${background!.toRadixString(16)}' : ''})';
 }
 
 /// Formatted text: its plain characters and their styles.
@@ -55,9 +132,18 @@ sealed class CardBlock {
   const CardBlock();
 }
 
+/// How a paragraph is laid out.
+enum LineStyle { normal, h1, h2, h3, quote, center, right, justify }
+
 class TextBlock extends CardBlock {
   final RichLine text;
-  const TextBlock(this.text);
+  final LineStyle style;
+  const TextBlock(this.text, {this.style = LineStyle.normal});
+}
+
+/// A horizontal line.
+class DividerBlock extends CardBlock {
+  const DividerBlock();
 }
 
 class ImageBlock extends CardBlock {
@@ -151,6 +237,17 @@ final _separator = RegExp(r'^\s*\|?(\s*:?-{2,}:?\s*\|)+\s*:?-{0,}:?\s*\|?\s*$');
 final _bold = RegExp(r'\*\*(?=\S)([\s\S]*?\S)\*\*');
 final _underline = RegExp(r'__(?=[^\s_])([\s\S]*?[^\s_])__(?!_)');
 final _size = RegExp(r'\[size=(\d{1,2})\]([\s\S]*?)\[/size\]');
+final _italic = RegExp(r'\[i\]([\s\S]*?)\[/i\]');
+final _strike = RegExp(r'\[s\]([\s\S]*?)\[/s\]');
+final _sup = RegExp(r'\[sup\]([\s\S]*?)\[/sup\]');
+final _sub = RegExp(r'\[sub\]([\s\S]*?)\[/sub\]');
+final _color = RegExp(r'\[color=#([0-9a-fA-F]{6})\]([\s\S]*?)\[/color\]');
+final _bg = RegExp(r'\[bg=#([0-9a-fA-F]{6})\]([\s\S]*?)\[/bg\]');
+
+/// A paragraph's look, set by a code at the start of its line:
+/// `[h1]` – `[h3]` headings, `[quote]`, `[center]` / `[right]` alignment.
+final _lineStyle = RegExp(r'^\[(h[1-3]|quote|center|right|justify)\] ?');
+final _divider = RegExp(r'^\s*\[hr\]\s*$');
 
 /// Whether [text] uses any formatting. Cards without it are shown exactly as
 /// before.
@@ -160,6 +257,13 @@ bool hasCardMarkup(String text) =>
     _bold.hasMatch(text) ||
     _underline.hasMatch(text) ||
     _size.hasMatch(text) ||
+    _italic.hasMatch(text) ||
+    _strike.hasMatch(text) ||
+    _sup.hasMatch(text) ||
+    _sub.hasMatch(text) ||
+    _color.hasMatch(text) ||
+    _bg.hasMatch(text) ||
+    text.split('\n').any((l) => _lineStyle.hasMatch(l) || _divider.hasMatch(l)) ||
     _hasTable(text);
 
 bool _hasTable(String text) => text.split('\n').any(_tableLine.hasMatch);
@@ -192,6 +296,21 @@ List<CardBlock> parseCardMarkup(String text) {
     if (occlusion != null) {
       flushParagraph();
       blocks.add(occlusion);
+      i++;
+      continue;
+    }
+    if (_divider.hasMatch(lines[i])) {
+      flushParagraph();
+      blocks.add(const DividerBlock());
+      i++;
+      continue;
+    }
+    final lineStyle = _lineStyle.firstMatch(lines[i]);
+    if (lineStyle != null) {
+      flushParagraph();
+      final style = LineStyle.values.byName(lineStyle.group(1)!);
+      final rest = lines[i].substring(lineStyle.end);
+      blocks.add(TextBlock(parseInline(rest), style: style));
       i++;
       continue;
     }
@@ -246,66 +365,63 @@ List<StyledRun> _inline(String text, StyledRun style) {
     // The formatting that starts first wins.
     RegExpMatch? first;
     var kind = '';
+    final rest = text.substring(position);
     for (final (pattern, name) in [
       (_size, 'size'),
       (_bold, 'bold'),
       (_underline, 'underline'),
+      (_italic, 'italic'),
+      (_strike, 'strike'),
+      (_sup, 'sup'),
+      (_sub, 'sub'),
+      (_color, 'color'),
+      (_bg, 'bg'),
     ]) {
-      final match = pattern.firstMatch(text.substring(position));
+      final match = pattern.firstMatch(rest);
       if (match != null && (first == null || match.start < first.start)) {
         first = match;
         kind = name;
       }
     }
     if (first == null) {
-      runs.add(_styled(text.substring(position), style));
+      runs.add(style.withText(rest));
       break;
     }
     if (first.start > 0) {
-      runs.add(
-        _styled(text.substring(position, position + first.start), style),
-      );
+      runs.add(style.withText(rest.substring(0, first.start)));
     }
-    final inner = switch (kind) {
-      'size' => StyledRun(
-        '',
-        bold: style.bold,
-        underline: style.underline,
-        size: double.parse(first.group(1)!).clamp(8, 48).toDouble(),
+    int hex(String value) => 0xFF000000 | int.parse(value, radix: 16);
+    final (inner, content) = switch (kind) {
+      'size' => (
+        style.copyWith(
+          size: double.parse(first.group(1)!).clamp(8, 48).toDouble(),
+        ),
+        first.group(2)!,
       ),
-      'bold' => StyledRun(
-        '',
-        bold: true,
-        underline: style.underline,
-        size: style.size,
-      ),
-      _ => StyledRun('', bold: style.bold, underline: true, size: style.size),
+      'bold' => (style.copyWith(bold: true), first.group(1)!),
+      'underline' => (style.copyWith(underline: true), first.group(1)!),
+      'italic' => (style.copyWith(italic: true), first.group(1)!),
+      'strike' => (style.copyWith(strike: true), first.group(1)!),
+      'sup' => (style.copyWith(script: Script.superscript), first.group(1)!),
+      'sub' => (style.copyWith(script: Script.subscript), first.group(1)!),
+      'color' => (style.copyWith(color: hex(first.group(1)!)), first.group(2)!),
+      _ => (style.copyWith(background: hex(first.group(1)!)), first.group(2)!),
     };
-    runs.addAll(_inline(first.group(kind == 'size' ? 2 : 1)!, inner));
+    runs.addAll(_inline(content, inner.withText('')));
     position += first.end;
   }
   return _merge(runs.where((r) => r.text.isNotEmpty).toList());
 }
 
-StyledRun _styled(String text, StyledRun style) => StyledRun(
-  text,
-  bold: style.bold,
-  underline: style.underline,
-  size: style.size,
-);
-
 /// Joins neighbouring runs with the same style.
 List<StyledRun> _merge(List<StyledRun> runs) {
   final merged = <StyledRun>[];
   for (final run in runs) {
-    if (merged.isNotEmpty) {
-      final last = merged.last;
-      if (last.bold == run.bold &&
-          last.underline == run.underline &&
-          last.size == run.size) {
-        merged[merged.length - 1] = _styled(last.text + run.text, last);
-        continue;
-      }
+    if (merged.isNotEmpty && merged.last.sameStyle(run)) {
+      merged[merged.length - 1] = merged.last.withText(
+        merged.last.text + run.text,
+      );
+      continue;
     }
     merged.add(run);
   }
@@ -320,6 +436,7 @@ String plainCardText(String text) {
         (block) => switch (block) {
           TextBlock(:final text) => text.plainText,
           ImageBlock() => '[image]',
+          DividerBlock() => '',
           OcclusionBlock() => '[image occlusion]',
           TableBlock(:final rows) =>
             rows

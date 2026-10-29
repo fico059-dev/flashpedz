@@ -7,16 +7,14 @@ import 'package:flashcards/data/repositories/flashcards/tag_repository.dart';
 import 'package:flashcards/domain/models/flashcards/admin_pack/admin_pack.dart';
 import 'package:flashcards/ui/constants/styles.dart';
 import 'package:flashcards/ui/theme/theme_extensions.dart';
-import 'package:flashcards/ui/widgets/core/bloc_text_field.dart';
 import 'package:flashcards/ui/widgets/core/card_factory.dart';
 import 'package:flashcards/ui/widgets/core/images/image_picker_button.dart';
 import 'package:flashcards/ui/widgets/core/loading_overlay_listener.dart';
-import 'package:flashcards/ui/widgets/profile/admin_dashboard/cloze_context_menu_builder.dart';
 import 'package:flashcards/ui/widgets/profile/admin_dashboard/flashcard_builder/tag_input.dart';
 import 'package:flashcards/utils/firebase_error_mapper.dart';
 import 'package:flashcards/ui/widgets/core/desktop_layout.dart';
 import 'package:flashcards/ui/pages/profile/admin_dashboard/flashcard_builder/image_occlusion_page.dart';
-import 'package:flashcards/ui/widgets/profile/admin_dashboard/flashcard_builder/card_format_toolbar.dart';
+import 'package:flashcards/ui/widgets/editor/rich_card_editor_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -72,6 +70,21 @@ class _ViewState extends State<_View> {
       answer: _answerCont.text,
       packId: widget.pack.packId,
       buttonType: buttonType,
+    );
+  }
+
+  /// Image occlusion: one card per box drawn over an image.
+  Future<void> _openOcclusion() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final made = await openImageOcclusionEditor(context, widget.pack);
+    if (made == null) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          "Made $made image occlusion card${made == 1 ? '' : 's'} "
+          "in ${widget.pack.packName}.",
+        ),
+      ),
     );
   }
 
@@ -149,22 +162,7 @@ class _ViewState extends State<_View> {
             actions: [
               IconButton(
                 tooltip: "Image occlusion cards",
-                onPressed: () async {
-                  final messenger = ScaffoldMessenger.of(context);
-                  final made = await openImageOcclusionEditor(
-                    context,
-                    widget.pack,
-                  );
-                  if (made == null) return;
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        "Made $made image occlusion card${made == 1 ? '' : 's'} "
-                        "in ${widget.pack.packName}.",
-                      ),
-                    ),
-                  );
-                },
+                onPressed: _openOcclusion,
                 icon: Icon(Icons.layers_outlined),
               ),
               IconButton(
@@ -216,23 +214,29 @@ class _ViewState extends State<_View> {
                       ],
                     ),
 
-                    CardFormatToolbar(controller: _questionCont),
-                    BlocTextField<CreateFlashcardCubit, CreateFlashcardState>(
-                      contextMenuBuilder: (context, editableTextState) =>
-                          clozeContextMenuBuilder(
-                            context,
-                            editableTextState,
-                            _questionCont,
-                          ),
-                      textEditingController: _questionCont,
-                      minLines: 3,
-                      maxLines: 10,
-                      errorSelector: (state) => state.status.isFromInvalid
+                    BlocSelector<
+                      CreateFlashcardCubit,
+                      CreateFlashcardState,
+                      String?
+                    >(
+                      selector: (state) => state.status.isFromInvalid
                           ? state.formErrors['question']
                           : null,
-                      labelText: "Question",
+                      builder: (context, error) => RichCardEditorLoader(
+                        controller: _questionCont,
+                        label: "Question",
+                        errorText: error,
+                        extraActions: [
+                          IconButton(
+                            tooltip: "Image occlusion: hide parts of an image",
+                            visualDensity: VisualDensity.compact,
+                            iconSize: 20,
+                            onPressed: _openOcclusion,
+                            icon: const Icon(Icons.layers_outlined),
+                          ),
+                        ],
+                      ),
                     ),
-                    CardMarkupPreview(controller: _questionCont),
 
                     SizedBox(),
 
@@ -253,17 +257,20 @@ class _ViewState extends State<_View> {
                         ),
                       ],
                     ),
-                    CardFormatToolbar(controller: _answerCont),
-                    BlocTextField<CreateFlashcardCubit, CreateFlashcardState>(
-                      textEditingController: _answerCont,
-                      minLines: 3,
-                      maxLines: 10,
-                      errorSelector: (state) => state.status.isFromInvalid
+                    BlocSelector<
+                      CreateFlashcardCubit,
+                      CreateFlashcardState,
+                      String?
+                    >(
+                      selector: (state) => state.status.isFromInvalid
                           ? state.formErrors['answer']
                           : null,
-                      labelText: "Answer",
+                      builder: (context, error) => RichCardEditorLoader(
+                        controller: _answerCont,
+                        label: "Answer",
+                        errorText: error,
+                      ),
                     ),
-                    CardMarkupPreview(controller: _answerCont),
 
                     SizedBox(height: 10),
                     BlocBuilder<CreateFlashcardCubit, CreateFlashcardState>(
