@@ -74,6 +74,77 @@ class TableBlock extends CardBlock {
   const TableBlock(this.rows, {required this.hasHeader});
 }
 
+/// A box over part of an image-occlusion image, as fractions of the
+/// image's width and height.
+class OcclusionMask {
+  final double x, y, w, h;
+
+  const OcclusionMask(this.x, this.y, this.w, this.h);
+
+  String encode() => [x, y, w, h].map((v) => v.toStringAsFixed(4)).join(',');
+
+  @override
+  bool operator ==(Object other) =>
+      other is OcclusionMask &&
+      other.x == x &&
+      other.y == y &&
+      other.w == w &&
+      other.h == h;
+
+  @override
+  int get hashCode => Object.hash(x, y, w, h);
+}
+
+/// An image with boxes hiding parts of it, like Anki's image occlusion:
+/// the box asked about ([target]) is shown in orange, the others in grey.
+/// On the answer ([revealed]) the target box is uncovered.
+class OcclusionBlock extends CardBlock {
+  final String url;
+  final List<OcclusionMask> masks;
+  final int target;
+  final bool revealed;
+
+  const OcclusionBlock({
+    required this.url,
+    required this.masks,
+    required this.target,
+    required this.revealed,
+  });
+}
+
+/// The card line of an image-occlusion card: `[occlusion](url)[masks]#n`,
+/// with `!` at the end on the answer side. Square brackets, as curly ones
+/// are cloze deletions.
+String occlusionLine({
+  required String url,
+  required List<OcclusionMask> masks,
+  required int target,
+  bool revealed = false,
+}) =>
+    '[occlusion]($url)[${masks.map((m) => m.encode()).join(';')}]'
+    '#$target${revealed ? '!' : ''}';
+
+final _occlusion = RegExp(
+  r'^\s*\[occlusion\]\((https?://[^\s)]+)\)\[([0-9.,;]*)\]#(\d+)(!?)\s*$',
+);
+
+OcclusionBlock? _parseOcclusion(String line) {
+  final match = _occlusion.firstMatch(line);
+  if (match == null) return null;
+  final masks = <OcclusionMask>[];
+  for (final part in match.group(2)!.split(';')) {
+    final values = part.split(',').map(double.tryParse).toList();
+    if (values.length != 4 || values.contains(null)) continue;
+    masks.add(OcclusionMask(values[0]!, values[1]!, values[2]!, values[3]!));
+  }
+  return OcclusionBlock(
+    url: match.group(1)!,
+    masks: masks,
+    target: int.parse(match.group(3)!),
+    revealed: match.group(4) == '!',
+  );
+}
+
 final _image = RegExp(r'!\[[^\]\n]*\]\((https?://[^\s)]+)\)');
 final _tableLine = RegExp(r'^\s*\|.*\|\s*$');
 final _separator = RegExp(r'^\s*\|?(\s*:?-{2,}:?\s*\|)+\s*:?-{0,}:?\s*\|?\s*$');
@@ -84,6 +155,7 @@ final _size = RegExp(r'\[size=(\d{1,2})\]([\s\S]*?)\[/size\]');
 /// Whether [text] uses any formatting. Cards without it are shown exactly as
 /// before.
 bool hasCardMarkup(String text) =>
+    text.split('\n').any(_occlusion.hasMatch) ||
     _image.hasMatch(text) ||
     _bold.hasMatch(text) ||
     _underline.hasMatch(text) ||
@@ -116,6 +188,13 @@ List<CardBlock> parseCardMarkup(String text) {
 
   var i = 0;
   while (i < lines.length) {
+    final occlusion = _parseOcclusion(lines[i]);
+    if (occlusion != null) {
+      flushParagraph();
+      blocks.add(occlusion);
+      i++;
+      continue;
+    }
     if (_tableLine.hasMatch(lines[i])) {
       flushParagraph();
       final rows = <List<RichLine>>[];
@@ -241,6 +320,7 @@ String plainCardText(String text) {
         (block) => switch (block) {
           TextBlock(:final text) => text.plainText,
           ImageBlock() => '[image]',
+          OcclusionBlock() => '[image occlusion]',
           TableBlock(:final rows) =>
             rows
                 .map((row) => row.map((cell) => cell.plainText).join(' | '))

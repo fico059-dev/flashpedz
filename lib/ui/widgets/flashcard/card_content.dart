@@ -44,6 +44,7 @@ class CardContent extends StatelessWidget {
               target: target,
             ),
             ImageBlock(:final url) => _CardImage(url: url),
+            OcclusionBlock() => OcclusionImage(block: block),
             TableBlock() => _CardTable(
               table: block,
               style: style,
@@ -186,4 +187,137 @@ class _CardTable extends StatelessWidget {
       ),
     );
   }
+}
+
+/// An image-occlusion image with its boxes drawn over it. Tap to see it
+/// larger.
+class OcclusionImage extends StatelessWidget {
+  final OcclusionBlock block;
+
+  /// Widest it is shown on the card.
+  final double maxWidth;
+
+  const OcclusionImage({super.key, required this.block, this.maxWidth = 640});
+
+  Widget _picture({double? width}) => Stack(
+    children: [
+      Image.network(
+        block.url,
+        width: width,
+        fit: BoxFit.fitWidth,
+        loadingBuilder: (context, child, progress) => progress == null
+            ? child
+            : const SizedBox(
+                height: 160,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+        errorBuilder: (context, error, stack) =>
+            const Icon(Icons.broken_image_outlined, size: 48),
+      ),
+      Positioned.fill(child: CustomPaint(painter: OcclusionPainter(block))),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth.clamp(0, maxWidth).toDouble()
+            : maxWidth;
+        return Center(
+          child: GestureDetector(
+            onTap: () => showDialog<void>(
+              context: context,
+              builder: (context) => Dialog(
+                insetPadding: const EdgeInsets.all(12),
+                child: Stack(
+                  children: [
+                    InteractiveViewer(maxScale: 5, child: _picture()),
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: IconButton.filledTonal(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: _picture(width: width),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Draws the boxes of an image-occlusion card: the asked one orange with a
+/// "?", the others grey; on the answer the asked one is only outlined.
+class OcclusionPainter extends CustomPainter {
+  final OcclusionBlock block;
+
+  OcclusionPainter(this.block);
+
+  static const asked = Color(0xFFFF9800);
+  static const other = Color(0xFF90A4AE);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    for (var i = 0; i < block.masks.length; i++) {
+      final m = block.masks[i];
+      final rect = Rect.fromLTWH(
+        m.x * size.width,
+        m.y * size.height,
+        m.w * size.width,
+        m.h * size.height,
+      );
+      final box = RRect.fromRectAndRadius(rect, const Radius.circular(4));
+      final isTarget = i == block.target;
+      if (isTarget && block.revealed) {
+        canvas.drawRRect(
+          box,
+          Paint()
+            ..color = asked
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3,
+        );
+        continue;
+      }
+      canvas.drawRRect(box, Paint()..color = isTarget ? asked : other);
+      canvas.drawRRect(
+        box,
+        Paint()
+          ..color = const Color(0x55000000)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+      if (isTarget) {
+        final painter = TextPainter(
+          text: TextSpan(
+            text: '?',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: (rect.shortestSide * 0.6).clamp(10, 40),
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        painter.paint(
+          canvas,
+          rect.center - Offset(painter.width / 2, painter.height / 2),
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(OcclusionPainter old) => old.block != block;
 }

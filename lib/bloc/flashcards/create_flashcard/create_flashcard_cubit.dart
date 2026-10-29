@@ -2,6 +2,7 @@ import 'package:flashcards/bloc/flashcards/create_flashcard/create_flashcard_sta
 import 'package:flashcards/data/repositories/flashcards/flashcard_repository.dart';
 import 'package:flashcards/data/repositories/flashcards/tag_repository.dart';
 import 'package:flashcards/domain/models/core/image_data_wrapper.dart';
+import 'package:flashcards/domain/models/flashcards/card_markup/card_markup.dart';
 import 'package:flashcards/domain/models/flashcards/flashcard/flashcard.dart';
 import 'package:flashcards/domain/models/flashcards/tag/tag.dart';
 import 'package:flashcards/utils/form_validations.dart';
@@ -18,7 +19,6 @@ class CreateFlashcardCubit extends Cubit<CreateFlashcardState> {
   }) : _flashcardRepo = flashcardRepo,
        _tagRepo = tagRepo,
        super(CreateFlashcardState());
-
 
   /// It's used when previewing the flashcard, since the flashcard actually doesn't
   /// exists, we need to generate it
@@ -48,7 +48,7 @@ class CreateFlashcardCubit extends Cubit<CreateFlashcardState> {
       question: question,
       answer: answer,
       tags: state.selectedTags,
-      isPaid: false
+      isPaid: false,
     );
 
     return fc;
@@ -187,6 +187,50 @@ class CreateFlashcardCubit extends Cubit<CreateFlashcardState> {
     );
 
     getAllAvailableTags();
+  }
+
+  /// Makes an image-occlusion card for every box, like Anki: each card asks
+  /// about one box (orange) with the others hidden too (grey), and its
+  /// answer uncovers that box. Returns how many cards were made.
+  Future<Result<int>> createOcclusionCards({
+    required String packId,
+    required String imageUrl,
+    required List<OcclusionMask> masks,
+    String prompt = '',
+    String extra = '',
+  }) async {
+    var made = 0;
+    for (var i = 0; i < masks.length; i++) {
+      final question = [
+        if (prompt.trim().isNotEmpty) prompt.trim(),
+        occlusionLine(url: imageUrl, masks: masks, target: i),
+      ].join('\n');
+      final answer = [
+        occlusionLine(url: imageUrl, masks: masks, target: i, revealed: true),
+        if (extra.trim().isNotEmpty) extra.trim(),
+      ].join('\n');
+      final result = await _flashcardRepo.createFlashcardAndAssignToPack(
+        question: question,
+        answer: answer,
+        packId: packId,
+        allAvailableTags: state.allAvailableTags ?? const [],
+        selectedTags: state.selectedTags,
+      );
+      switch (result) {
+        case Error<void>(:final error):
+          return Result.error(
+            made == 0
+                ? error
+                : Exception(
+                    'Made $made of ${masks.length} cards, then: $error',
+                  ),
+          );
+        case Ok<void>():
+          made++;
+      }
+    }
+    getAllAvailableTags();
+    return Result.ok(made);
   }
 
   Map<String, String> _validateForm(String question, String answer) {

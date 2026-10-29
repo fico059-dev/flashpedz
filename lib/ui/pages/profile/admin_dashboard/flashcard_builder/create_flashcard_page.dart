@@ -15,6 +15,7 @@ import 'package:flashcards/ui/widgets/profile/admin_dashboard/cloze_context_menu
 import 'package:flashcards/ui/widgets/profile/admin_dashboard/flashcard_builder/tag_input.dart';
 import 'package:flashcards/utils/firebase_error_mapper.dart';
 import 'package:flashcards/ui/widgets/core/desktop_layout.dart';
+import 'package:flashcards/ui/pages/profile/admin_dashboard/flashcard_builder/image_occlusion_page.dart';
 import 'package:flashcards/ui/widgets/profile/admin_dashboard/flashcard_builder/card_format_toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -146,6 +147,26 @@ class _ViewState extends State<_View> {
               icon: Icon(Icons.arrow_back),
             ),
             actions: [
+              IconButton(
+                tooltip: "Image occlusion cards",
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final made = await openImageOcclusionEditor(
+                    context,
+                    widget.pack,
+                  );
+                  if (made == null) return;
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        "Made $made image occlusion card${made == 1 ? '' : 's'} "
+                        "in ${widget.pack.packName}.",
+                      ),
+                    ),
+                  );
+                },
+                icon: Icon(Icons.layers_outlined),
+              ),
               IconButton(
                 onPressed: _onFcPreview,
                 icon: Icon(Icons.remove_red_eye),
