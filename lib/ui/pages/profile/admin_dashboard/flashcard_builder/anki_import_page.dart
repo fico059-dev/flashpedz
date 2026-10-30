@@ -8,6 +8,8 @@ import 'package:flashcards/data/repositories/flashcards/flashcard_repository.dar
 import 'package:flashcards/data/services/anki/anki_import_models.dart';
 import 'package:flashcards/data/services/anki/anki_import_service.dart';
 import 'package:flashcards/domain/models/flashcards/admin_pack/admin_pack.dart';
+import 'package:flashcards/domain/models/flashcards/card_markup/card_markup.dart';
+import 'package:flashcards/ui/widgets/flashcard/card_content.dart';
 import 'package:flashcards/ui/constants/styles.dart';
 import 'package:flashcards/ui/theme/theme_extensions.dart';
 import 'package:flashcards/utils/firebase_error_mapper.dart';
@@ -321,6 +323,7 @@ class _Preview extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final cards = result.cards;
     final clozeCount = cards.where((c) => c.isCloze).length;
+    final occlusionCount = cards.where((c) => c.isOcclusion).length;
     final imageCount = cards
         .where((c) => c.questionImage != null || c.answerImage != null)
         .length;
@@ -347,6 +350,12 @@ class _Preview extends StatelessWidget {
                         icon: Icons.text_fields,
                         label: "Cloze cards",
                         value: clozeCount,
+                      ),
+                    if (occlusionCount > 0)
+                      _StatTile(
+                        icon: Icons.layers,
+                        label: "Image occlusion cards",
+                        value: occlusionCount,
                       ),
                     if (imageCount > 0)
                       _StatTile(
@@ -462,6 +471,9 @@ class _CardPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    if (card.occlusionImage != null) {
+      return _OcclusionPreview(card: card);
+    }
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -503,6 +515,64 @@ class _CardPreview extends StatelessWidget {
                 if (card.answerImage != null)
                   _ImageThumbnail(image: card.answerImage!),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// An image-occlusion card: the picture with its boxes, the asked one in
+/// orange, as it will look when studied.
+class _OcclusionPreview extends StatelessWidget {
+  final AnkiCard card;
+
+  const _OcclusionPreview({required this.card});
+
+  @override
+  Widget build(BuildContext context) {
+    final blocks = parseCardMarkup(card.question);
+    final block = blocks.whereType<OcclusionBlock>().firstOrNull;
+    final header = card.question
+        .split('\n')
+        .where((line) => !line.startsWith('[occlusion]('))
+        .join('\n')
+        .trim();
+    final image = card.occlusionImage!;
+    final picture = image.bytes != null
+        ? Image.memory(image.bytes!, fit: BoxFit.fitWidth, cacheWidth: 640)
+        : Image.file(File(image.path), fit: BoxFit.fitWidth, cacheWidth: 640);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 6,
+          children: [
+            if (header.isNotEmpty)
+              Text(
+                header,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: Stack(
+                  children: [
+                    picture,
+                    if (block != null)
+                      Positioned.fill(
+                        child: CustomPaint(painter: OcclusionPainter(block)),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),

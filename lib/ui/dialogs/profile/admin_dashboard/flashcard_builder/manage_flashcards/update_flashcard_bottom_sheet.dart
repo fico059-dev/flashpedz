@@ -102,6 +102,7 @@ class _UpdateFormState extends State<_UpdateForm> {
         url: result.url,
         masks: result.masks,
         target: result.target,
+        alsoAsked: result.alsoAsked,
       ),
       first: false,
     );
@@ -111,6 +112,7 @@ class _UpdateFormState extends State<_UpdateForm> {
         url: result.url,
         masks: result.masks,
         target: result.target,
+        alsoAsked: result.alsoAsked,
         revealed: true,
       ),
       first: true,

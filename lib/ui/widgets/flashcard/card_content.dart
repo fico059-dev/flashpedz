@@ -300,7 +300,7 @@ class OcclusionPainter extends CustomPainter {
         m.h * size.height,
       );
       final box = RRect.fromRectAndRadius(rect, const Radius.circular(4));
-      final isTarget = i == block.target;
+      final isTarget = block.asks(i);
       if (isTarget && block.revealed) {
         canvas.drawRRect(
           box,

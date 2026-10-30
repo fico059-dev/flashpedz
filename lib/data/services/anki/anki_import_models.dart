@@ -1,5 +1,8 @@
+import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flashcards/data/services/anki/anki_occlusion.dart';
 import 'package:flashcards/data/services/anki/anki_text_converter.dart';
 
 /// An image referenced by an Anki card. It is extracted from the deck to a
@@ -50,6 +53,10 @@ class AnkiCard {
   final List<String> tags;
   final bool isCloze;
 
+  /// The picture of an image-occlusion card. The card's text refers to it as
+  /// [ankiOcclusionImageUrl] until it is uploaded.
+  final AnkiImage? occlusionImage;
+
   /// Identifies the Anki note (and cloze number) the card came from, so a
   /// later import of the same deck updates it instead of adding it again.
   final String? sourceKey;
@@ -61,12 +68,28 @@ class AnkiCard {
     this.answerImage,
     this.tags = const [],
     this.isCloze = false,
+    this.occlusionImage,
     this.sourceKey,
   });
 
+  bool get isOcclusion => occlusionImage != null;
+
   /// The images of both sides, to notice when they change.
   String get imagesKey =>
-      '${questionImage?.key ?? ''}/${answerImage?.key ?? ''}';
+      '${questionImage?.key ?? ''}/${answerImage?.key ?? ''}'
+      '${occlusionImage == null ? '' : '/${occlusionImage!.key}'}';
+
+  /// This card with its occlusion picture at [url].
+  AnkiCard withOcclusionUrl(String url) => AnkiCard(
+    question: question.replaceAll(ankiOcclusionImageUrl, url),
+    answer: answer.replaceAll(ankiOcclusionImageUrl, url),
+    questionImage: questionImage,
+    answerImage: answerImage,
+    tags: tags,
+    isCloze: isCloze,
+    occlusionImage: occlusionImage,
+    sourceKey: sourceKey,
+  );
 }
 
 /// Everything read from an Anki export, before anything is uploaded.
@@ -145,6 +168,11 @@ class AnkiNoteConverter {
     final fields = note.fields;
     if (fields.isEmpty) return [];
 
+    final occlusionFieldIndex = fields.indexWhere(isImageOcclusionField);
+    if (occlusionFieldIndex != -1) {
+      return _convertOcclusionNote(note, occlusionFieldIndex);
+    }
+
     final clozeFieldIndex = fields.indexWhere(hasCloze);
     if (clozeFieldIndex != -1) {
       return _convertClozeNote(note, clozeFieldIndex);
@@ -213,6 +241,62 @@ class AnkiNoteConverter {
         )
         .where((card) => card.question.isNotEmpty)
         .toList();
+  }
+
+  /// A note made with Anki's Image Occlusion. Its fields are Occlusion,
+  /// Image, Header, Back Extra and Comments; the header goes above the
+  /// picture and the back extra below it on the answer.
+  List<AnkiCard> _convertOcclusionNote(AnkiNote note, int occlusionIndex) {
+    final fields = note.fields;
+    final shapes = parseAnkiOcclusionShapes(fields[occlusionIndex]);
+    final imageIndex = fields.indexWhere(
+      (f) => extractImageNames(f).isNotEmpty,
+    );
+    if (shapes.isEmpty || imageIndex == -1) return [];
+    final name = extractImageNames(fields[imageIndex]).first;
+    final image = _findImage(name);
+    if (image == null) {
+      missingImages++;
+      return [];
+    }
+
+    final rest = [
+      for (var i = 0; i < fields.length; i++)
+        if (i != occlusionIndex && i != imageIndex) htmlToPlainText(fields[i]),
+    ];
+    final header = rest.isNotEmpty ? rest[0] : '';
+    final backExtra = rest.length > 1 ? rest[1] : '';
+    final imageSize = shapes.any((s) => s.isInPixels)
+        ? _imageSize(image)
+        : null;
+
+    return [
+      for (final card in ankiOcclusionCards(shapes, imageSize: imageSize))
+        AnkiCard(
+          question: [
+            if (header.isNotEmpty) header,
+            card.question,
+          ].join('\n'),
+          answer: [
+            card.answer,
+            if (backExtra.isNotEmpty) backExtra,
+          ].join('\n'),
+          tags: note.tags,
+          occlusionImage: image,
+          sourceKey: note.guid == null
+              ? null
+              : 'anki:${note.guid}:c${card.ordinal}',
+        ),
+    ];
+  }
+
+  Point<int>? _imageSize(AnkiImage image) {
+    try {
+      final bytes = image.bytes ?? File(image.path).readAsBytesSync();
+      return imageSizeOf(bytes);
+    } on Object {
+      return null;
+    }
   }
 
   /// All the images of a side, in order. Several images are later joined

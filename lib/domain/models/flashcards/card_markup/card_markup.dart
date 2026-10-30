@@ -188,30 +188,38 @@ class OcclusionBlock extends CardBlock {
   final String url;
   final List<OcclusionMask> masks;
   final int target;
+
+  /// More boxes asked together with [target] (shapes grouped in Anki).
+  final List<int> alsoAsked;
   final bool revealed;
 
   const OcclusionBlock({
     required this.url,
     required this.masks,
     required this.target,
+    this.alsoAsked = const [],
     required this.revealed,
   });
+
+  /// Whether the box at [index] is one of the boxes asked about.
+  bool asks(int index) => index == target || alsoAsked.contains(index);
 }
 
 /// The card line of an image-occlusion card: `[occlusion](url)[masks]#n`,
-/// with `!` at the end on the answer side. Square brackets, as curly ones
-/// are cloze deletions.
+/// with `!` at the end on the answer side, and `#n+m` when several boxes are
+/// asked together. Square brackets, as curly ones are cloze deletions.
 String occlusionLine({
   required String url,
   required List<OcclusionMask> masks,
   required int target,
+  List<int> alsoAsked = const [],
   bool revealed = false,
 }) =>
     '[occlusion]($url)[${masks.map((m) => m.encode()).join(';')}]'
-    '#$target${revealed ? '!' : ''}';
+    '#${[target, ...alsoAsked].join('+')}${revealed ? '!' : ''}';
 
 final _occlusion = RegExp(
-  r'^\s*\[occlusion\]\((https?://[^\s)]+)\)\[([0-9.,;]*)\]#(\d+)(!?)\s*$',
+  r'^\s*\[occlusion\]\((https?://[^\s)]+)\)\[([0-9.,;]*)\]#(\d+(?:\+\d+)*)(!?)\s*$',
 );
 
 OcclusionBlock? _parseOcclusion(String line) {
@@ -223,10 +231,12 @@ OcclusionBlock? _parseOcclusion(String line) {
     if (values.length != 4 || values.contains(null)) continue;
     masks.add(OcclusionMask(values[0]!, values[1]!, values[2]!, values[3]!));
   }
+  final asked = match.group(3)!.split('+').map(int.parse).toList();
   return OcclusionBlock(
     url: match.group(1)!,
     masks: masks,
-    target: int.parse(match.group(3)!),
+    target: asked.first,
+    alsoAsked: asked.skip(1).toList(),
     revealed: match.group(4) == '!',
   );
 }

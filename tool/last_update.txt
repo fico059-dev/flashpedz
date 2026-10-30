@@ -1,1 +1,1 @@
-FlashPedz update: 30 Oct 2026 (fix 2) - card editor patched so the website and iPhone app build with Flutter 3.47; word-processor card editor, image occlusion, daily limits, OSCE Study/Exam, tutorial Exit.
+FlashPedz update: 30 Oct 2026 (fix 3) - Anki image occlusion cards import as FlashPedz occlusion cards; clear Exit tutorial button; editor works with Flutter 3.47.

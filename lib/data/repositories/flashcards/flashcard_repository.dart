@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flashcards/data/services/api/dto/flashcards/custom_session/flashcard_ids/flashcard_ids_patch/flashcard_ids_patch_dto.dart';
 import 'package:flashcards/data/services/api/dto/flashcards/fcp_data/fcp_data_dto.dart';
+import 'package:flashcards/data/remote/cloud_function_service.dart';
 import 'package:flashcards/data/services/anki/anki_import_models.dart';
+import 'package:flashcards/data/services/anki/anki_occlusion.dart';
 import 'package:flashcards/data/services/anki/anki_tags.dart';
 import 'package:flashcards/data/services/api/dto/flashcards/pack/pack_dto.dart';
 import 'package:flashcards/data/services/api/dto/flashcards/tag/tag_dto.dart';
@@ -25,6 +28,7 @@ import 'package:flashcards/data/services/api/flashcards/tag_service.dart';
 import 'package:flashcards/domain/models/core/image_data_wrapper.dart';
 import 'package:flashcards/domain/models/core/picked_image.dart';
 import 'package:flashcards/domain/models/flashcards/admin_pack/admin_pack.dart';
+import 'package:flashcards/domain/models/flashcards/card_markup/card_markup.dart';
 import 'package:flashcards/domain/models/flashcards/flashcard/flashcard.dart';
 import 'package:flashcards/domain/models/flashcards/flashcard_review/flashcard_review.dart';
 import 'package:flashcards/domain/models/flashcards/pack/pack.dart';
@@ -89,6 +93,21 @@ ImportAction decideImportAction(
     return ImportAction.link;
   }
   return ImportAction.unchanged;
+}
+
+/// The address of the picture an existing card already shows for an
+/// imported image-occlusion card, when the deck still uses the same picture.
+/// Then it isn't uploaded again.
+String? reusableOcclusionUrl(AnkiCard card, Flashcard existing) {
+  if (!card.isOcclusion || existing.sourceImages != card.imagesKey) {
+    return null;
+  }
+  for (final block in parseCardMarkup(existing.question)) {
+    if (block is OcclusionBlock && block.url != ankiOcclusionImageUrl) {
+      return block.url;
+    }
+  }
+  return null;
 }
 
 bool _sameSet(Iterable<String> a, Iterable<String> b) {
@@ -650,7 +669,7 @@ class FlashcardRepository {
     final toImport = <AnkiCard>[];
     final toUpdate = <(Flashcard, AnkiCard)>[];
     final toLink = <(Flashcard, AnkiCard)>[];
-    for (final card in cards) {
+    for (var card in cards) {
       // The same card twice in the file.
       if (!seenInFile.add(card.sourceKey ?? 'q:${card.question}')) {
         skipped++;
@@ -669,6 +688,10 @@ class FlashcardRepository {
         }
       }
       if (match != null && !claimed.add(match.id)) match = null;
+      if (match != null) {
+        final url = reusableOcclusionUrl(card, match);
+        if (url != null) card = card.withOcclusionUrl(url);
+      }
 
       switch (decideImportAction(card, match, importTags: importTags)) {
         case ImportAction.add:
@@ -685,6 +708,25 @@ class FlashcardRepository {
     final total = toImport.length + toUpdate.length;
     onProgress(0, total);
 
+    // Image-occlusion cards share their note's picture: it is uploaded once.
+    final occlusionUploads = <String, Future<String?>>{};
+    Future<AnkiCard?> withOcclusionImage(AnkiCard card) async {
+      if (!card.isOcclusion ||
+          !'${card.question}${card.answer}'.contains(ankiOcclusionImageUrl)) {
+        return card;
+      }
+      final image = card.occlusionImage!;
+      final url = await occlusionUploads.putIfAbsent(
+        image.key,
+        () => _uploadOcclusionImage(image),
+      );
+      if (url == null) {
+        failedImages++;
+        return null;
+      }
+      return card.withOcclusionUrl(url);
+    }
+
     final packRef = _packService.getDocumentReference(packId);
     // Every imported card's tags, used to update the cached tag counts.
     final importedTagIds = <String>[];
@@ -698,7 +740,10 @@ class FlashcardRepository {
       for (var i = 0; i < batch.length; i += parallelUploads) {
         final group = batch.skip(i).take(parallelUploads);
         final uploaded = await Future.wait(
-          group.map((card) async {
+          group.map((ankiCard) async {
+            // Without its picture an occlusion card can't be shown.
+            final card = await withOcclusionImage(ankiCard);
+            if (card == null) return null;
             final ref = _flashcardService.createDocumentReference();
             final questionUrl = await _uploadImportedImage(
               ref.id,
@@ -729,8 +774,8 @@ class FlashcardRepository {
             );
           }),
         );
-        flashcards.addAll(uploaded);
-        onProgress(imported + flashcards.length, total);
+        flashcards.addAll(uploaded.nonNulls);
+        onProgress(imported + i + group.length, total);
       }
 
       try {
@@ -813,7 +858,9 @@ class FlashcardRepository {
       final group = toUpdate.skip(i).take(parallelUpdates);
       final results = await Future.wait(
         group.map((pair) async {
-          final (existing, card) = pair;
+          final (existing, ankiCard) = pair;
+          final card = await withOcclusionImage(ankiCard);
+          if (card == null) return false;
           final plan = ImportImagePlan.of(card, existing);
           Uint8List? questionBytes;
           Uint8List? answerBytes;
@@ -877,6 +924,18 @@ class FlashcardRepository {
       failedImages: failedImages,
       failedUpdates: failedUpdates,
     );
+  }
+
+  /// Uploads the picture of an imported image-occlusion card, like pictures
+  /// placed in a card's text. Returns null if it failed.
+  static Future<String?> _uploadOcclusionImage(AnkiImage image) async {
+    final bytes = await importedImageBytes(image);
+    if (bytes == null) return null;
+    try {
+      return await CloudFunctionService().uploadCardImage(base64Encode(bytes));
+    } on Object {
+      return null;
+    }
   }
 
   /// Compresses and uploads an imported image. Returns null if it failed, in

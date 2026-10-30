@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -13,6 +12,7 @@ import 'package:flashcards/ui/widgets/flashcard/card_content.dart';
 import 'package:flashcards/utils/firebase_error_mapper.dart';
 import 'package:flashcards/utils/result.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -230,6 +230,7 @@ class _ImageOcclusionPageState extends State<ImageOcclusionPage> {
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
+    final editing = widget.editing;
     try {
       final image = _image;
       final url = image != null
@@ -240,6 +241,12 @@ class _ImageOcclusionPageState extends State<ImageOcclusionPage> {
           url: url,
           masks: List.of(_masks),
           target: target,
+          // Boxes asked together (from Anki) stay so while they're unchanged.
+          alsoAsked: editing != null &&
+                  target == editing.target &&
+                  listEquals(_masks, editing.masks)
+              ? editing.alsoAsked
+              : const [],
           revealed: false,
         ),
       );

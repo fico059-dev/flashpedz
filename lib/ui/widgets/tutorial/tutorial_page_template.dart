@@ -65,7 +65,10 @@ class _TutorialPageTemplateState extends State<TutorialPageTemplate> {
                   child: TextButton.icon(
                     onPressed: _finish,
                     icon: const Icon(Icons.close),
-                    label: const Text("Exit"),
+                    label: const Text(
+                      "Exit",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ),
@@ -154,6 +157,14 @@ class _TutorialPageTemplateState extends State<TutorialPageTemplate> {
                           : null,
                       child: const Text("Previous"),
                     ),
+                    // A clear way out next to Next, not only the small
+                    // button at the top.
+                    if (_currentPage < widget.slides.length - 1)
+                      OutlinedButton.icon(
+                        onPressed: _finish,
+                        icon: const Icon(Icons.close, size: 18),
+                        label: const Text("Exit tutorial"),
+                      ),
                     // Next
                     FilledButton(
                       onPressed: _currentPage < widget.slides.length - 1
