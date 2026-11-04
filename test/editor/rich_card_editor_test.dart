@@ -134,4 +134,38 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('on a phone the toolbar is one row that scrolls sideways', (
+    tester,
+  ) async {
+    // A small phone (iPhone SE).
+    tester.view.physicalSize = const Size(375 * 2, 667 * 2);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    final controller = TextEditingController(text: 'Hi');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: RichCardEditor(controller: controller, label: 'Question'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final sideways = find.byWidgetPredicate(
+      (w) => w is SingleChildScrollView && w.scrollDirection == Axis.horizontal,
+    );
+    expect(sideways, findsOneWidget);
+    // Every button is still there, further along the row.
+    expect(find.byTooltip('Bold'), findsOneWidget);
+    expect(find.byTooltip('Insert image'), findsOneWidget);
+
+    // With the keyboard open the writing area gets smaller.
+    final area = find.byWidgetPredicate(
+      (w) => w is SizedBox && w.height == 280,
+    );
+    expect(area, findsOneWidget);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 260 * 2);
+    await tester.pumpAndSettle();
+    expect(area, findsNothing);
+  });
 }

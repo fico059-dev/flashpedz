@@ -59,7 +59,8 @@ class RichCardEditor extends StatefulWidget {
   State<RichCardEditor> createState() => RichCardEditorState();
 }
 
-class RichCardEditorState extends State<RichCardEditor> {
+class RichCardEditorState extends State<RichCardEditor>
+    with WidgetsBindingObserver {
   late EditorState _editor;
   StreamSubscription<EditorTransactionValue>? _changes;
   String _synced = '';
@@ -79,6 +80,13 @@ class RichCardEditorState extends State<RichCardEditor> {
     super.initState();
     _load(widget.controller.text);
     widget.controller.addListener(_onControllerChanged);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// The keyboard opened or closed: the editing area's height changes.
+  @override
+  void didChangeMetrics() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -93,6 +101,7 @@ class RichCardEditorState extends State<RichCardEditor> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_onControllerChanged);
     _changes?.cancel();
     _editor.dispose();
@@ -510,8 +519,7 @@ class RichCardEditorState extends State<RichCardEditor> {
     return Listener(
       // Remember the selection before a button or menu takes the focus.
       onPointerDown: (_) => _savedSelection = _editor.selection,
-      child: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: _ToolbarLayout(
         children: [
           _button(Icons.undo, 'Undo', () => _editor.undoManager.undo()),
           _button(Icons.redo, 'Redo', () => _editor.undoManager.redo()),
@@ -791,6 +799,17 @@ class RichCardEditorState extends State<RichCardEditor> {
     );
   }
 
+  double _editorHeight(BuildContext context) {
+    final height = _tall ? 560.0 : 280.0;
+    // From the screen itself: a page's Scaffold hides the keyboard from the
+    // widgets inside it.
+    final screen = MediaQueryData.fromView(View.of(context));
+    final keyboard = screen.viewInsets.bottom;
+    if (keyboard == 0) return height;
+    final room = screen.size.height - keyboard - 180;
+    return room.clamp(140.0, height);
+  }
+
   Widget _build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final error = widget.errorText;
@@ -823,8 +842,10 @@ class RichCardEditorState extends State<RichCardEditor> {
                 child: _toolbar(),
               ),
               SizedBox(
-                // The editing area scrolls inside, like Anki's editor.
-                height: _tall ? 560 : 280,
+                // The editing area scrolls inside, like Anki's editor. With
+                // a phone's keyboard open it gets smaller, so the line being
+                // typed stays in view above the keyboard.
+                height: _editorHeight(context),
                 child: _source
                     ? Padding(
                         padding: const EdgeInsets.all(8),
@@ -1065,6 +1086,55 @@ class _TableWidgetState extends State<_TableWidget> {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// The toolbar's buttons: in rows on wide screens, and on phones in one row
+/// that scrolls sideways, so the text keeps most of the space next to the
+/// keyboard.
+class _ToolbarLayout extends StatelessWidget {
+  final List<Widget> children;
+
+  const _ToolbarLayout({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 600) {
+          return Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: children,
+          );
+        }
+        final fade = Theme.of(context).colorScheme.surfaceContainerHigh;
+        return Stack(
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.only(right: 24),
+              child: Row(children: children),
+            ),
+            // Shows there are more buttons to the right.
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Container(
+                  width: 24,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [fade.withValues(alpha: 0), fade],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

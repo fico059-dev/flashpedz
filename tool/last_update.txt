@@ -1,1 +1,1 @@
-FlashPedz update: 30 Oct 2026 (fix 3) - Anki image occlusion cards import as FlashPedz occlusion cards; clear Exit tutorial button; editor works with Flutter 3.47.
+FlashPedz update: 4 Nov 2026 - Undo, My Sets, topics, leave out tags, browse session cards, highlight PDF export, Underline, menus instead of swiping, bookmark freeze fixed, phone editor.
