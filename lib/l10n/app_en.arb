@@ -227,7 +227,7 @@
     }
   },
   "reviewBookmarkPage_remove": "Remove bookmark",
-  "reviewBookmarkPage_swipe": "Swipe left to remove bookmark",
+  "reviewBookmarkPage_swipe": "Tap ⋮ on a card to remove its bookmark or add it to a set",
 
   "osceListPage_title": "OSCEs",
   "osceListPage_fetching": "Fetching OSCE scenarios...",

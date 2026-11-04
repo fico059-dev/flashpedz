@@ -8,7 +8,6 @@ import 'package:flashcards/ui/widgets/profile/admin_dashboard/flashcard_builder/
 import 'package:flashcards/ui/dialogs/profile/admin_dashboard/flashcard_builder/manage_flashcards/update_flashcard_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
 
 class EditFlashcardCard extends StatelessWidget {
   final Flashcard flashcard;
@@ -45,27 +44,9 @@ class EditFlashcardCard extends StatelessWidget {
       }
     }
 
-    return Slidable(
+    return Builder(
       key: ValueKey(flashcard.id),
-      endActionPane: ActionPane(
-        extentRatio: 0.6,
-        motion: DrawerMotion(),
-        children: [
-          SlidableAction(
-            backgroundColor: context.colors.error,
-            onPressed: (context) => onDelete(),
-            icon: Icons.delete_forever,
-            label: 'Delete',
-          ),
-          SlidableAction(
-            backgroundColor: context.customColors.info,
-            onPressed: (context) => onUpdateDialog(),
-            icon: Icons.edit,
-            label: "Edit",
-          ),
-        ],
-      ),
-      child: Material(
+      builder: (context) => Material(
         borderRadius: BorderRadius.circular(12),
         color: context.colors.secondaryContainer.withValues(alpha: 0.6),
         elevation: 2,
@@ -83,6 +64,41 @@ class EditFlashcardCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: context.colors.onSecondaryContainer),
+                ),
+                trailing: PopupMenuButton<_CardAction>(
+                  tooltip: 'Card options',
+                  onSelected: (action) => switch (action) {
+                    _CardAction.edit => onUpdateDialog(),
+                    _CardAction.delete => onDelete(),
+                    _CardAction.more => showManageFlashcardBottomSheet(
+                      context,
+                      flashcard,
+                      packId,
+                    ),
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: _CardAction.edit,
+                      child: ListTile(
+                        leading: Icon(Icons.edit),
+                        title: Text('Edit'),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: _CardAction.delete,
+                      child: ListTile(
+                        leading: Icon(Icons.delete_outline),
+                        title: Text('Delete'),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: _CardAction.more,
+                      child: ListTile(
+                        leading: Icon(Icons.more_horiz),
+                        title: Text('More options'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               ListTile(
@@ -102,3 +118,5 @@ class EditFlashcardCard extends StatelessWidget {
     );
   }
 }
+
+enum _CardAction { edit, delete, more }

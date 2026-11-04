@@ -4,7 +4,6 @@ import 'package:flashcards/ui/constants/styles.dart';
 import 'package:flashcards/ui/theme/theme_extensions.dart';
 import 'package:flashcards/utils/util_functions.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:shimmer/shimmer.dart';
 
 class OsceAttemptCard extends StatelessWidget {
@@ -24,21 +23,8 @@ class OsceAttemptCard extends StatelessWidget {
 
     return Container(
       margin: EdgeInsets.only(bottom: 16),
-      child: Slidable(
-        key: ValueKey(attempt.id),
-        endActionPane: ActionPane(
-          extentRatio: 0.3,
-          motion: DrawerMotion(),
-          children: [
-            SlidableAction(
-              backgroundColor: context.colors.error,
-              onPressed: (context) => onDelete(),
-              icon: Icons.delete_forever,
-              label: 'Delete',
-            ),
-          ],
-        ),
-        child: Card(
+      child: Builder(
+        builder: (context) => Card(
           margin: const EdgeInsets.all(0),
           color: context.colors.surfaceContainerHigh,
           child: Padding(
@@ -49,9 +35,9 @@ class OsceAttemptCard extends StatelessWidget {
                 // Datum pokušaja
                 Text(
                   dateFormatted,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: context.colors.onSurfaceVariant),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.colors.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 12),
 
@@ -63,11 +49,34 @@ class OsceAttemptCard extends StatelessWidget {
                       "Result",
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    Text(
-                      "${attempt.achievedScore} / ${attempt.maxScore}",
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "${attempt.achievedScore} / ${attempt.maxScore}",
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(
+                          width: 36,
+                          height: 28,
+                          child: PopupMenuButton<int>(
+                            tooltip: 'Attempt options',
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.more_vert, size: 20),
+                            onSelected: (_) => onDelete(),
+                            itemBuilder: (context) => const [
+                              PopupMenuItem(
+                                value: 0,
+                                child: ListTile(
+                                  leading: Icon(Icons.delete_outline),
+                                  title: Text('Delete attempt'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

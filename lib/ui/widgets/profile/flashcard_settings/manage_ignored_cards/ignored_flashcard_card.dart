@@ -6,7 +6,6 @@ import 'package:flashcards/ui/constants/styles.dart';
 import 'package:flashcards/ui/theme/theme_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:swipeable_tile/swipeable_tile.dart';
 
 class IgnoredFlashcardCard extends StatelessWidget {
   final IgnoredFlashcard card;
@@ -52,33 +51,18 @@ class IgnoredFlashcardCard extends StatelessWidget {
       );
     }
 
-    return SwipeableTile.card(
-      shadow: BoxShadow(color: context.customColors.success),
-      borderRadius: 12,
-      horizontalPadding: horizontalScreenPadding,
-      verticalPadding: 7,
-      key: key!,
-      color: Colors.transparent,
-      swipeThreshold: 0.4,
-      direction: SwipeDirection.endToStart,
-      onSwiped: (direction) {
-        context.read<IgnoredCardBloc>().add(
-          IgnoredCardUnignored(ignoredCard: card),
-        );
-        showSuccessSnackBar();
-      },
-      backgroundBuilder: (context, direction, progress) {
-        return Container(
-          alignment: Alignment.center,
-          color: context.customColors.success,
-          child: ListTile(
-            trailing: Icon(
-              Icons.visibility,
-              color: context.customColors.onSuccess,
-            ),
-          ),
-        );
-      },
+    void unignore() {
+      context.read<IgnoredCardBloc>().add(
+        IgnoredCardUnignored(ignoredCard: card),
+      );
+      showSuccessSnackBar();
+    }
+
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalScreenPadding,
+        vertical: 7,
+      ),
       child: Material(
         color: context.colors.primaryContainer,
         borderRadius: BorderRadius.circular(12),
@@ -88,10 +72,30 @@ class IgnoredFlashcardCard extends StatelessWidget {
           //onTap: () {},
           child: Ink(
             width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [Text(plainCardText(card.question), style: textStyle)],
+            padding: const EdgeInsets.fromLTRB(20, 12, 4, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(plainCardText(card.question), style: textStyle),
+                ),
+                PopupMenuButton<int>(
+                  tooltip: 'Card options',
+                  icon: Icon(
+                    Icons.more_vert,
+                    color: context.colors.onPrimaryContainer,
+                  ),
+                  onSelected: (_) => unignore(),
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 0,
+                      child: ListTile(
+                        leading: Icon(Icons.visibility),
+                        title: Text('Unignore'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),

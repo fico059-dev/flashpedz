@@ -11,7 +11,7 @@ import 'package:flashcards/utils/util_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:swipeable_tile/swipeable_tile.dart';
+import 'package:flashcards/ui/dialogs/card_sets/card_set_dialogs.dart';
 
 class BookmarkCard extends StatefulWidget {
   final int index;
@@ -95,6 +95,13 @@ class _BookmarkCardState extends State<BookmarkCard> {
       );
     }
 
+    void remove() {
+      context.read<BookmarkReviewBloc>().add(
+        BookmarkReviewBookmarkRemoved(bookmark: widget.bookmark),
+      );
+      showSuccessSnackBar();
+    }
+
     final textStyle = Theme.of(context).textTheme.bodyLarge?.copyWith(
       color: !widget.isAnswerVisible
           ? context.colors.onPrimaryContainer
@@ -104,75 +111,101 @@ class _BookmarkCardState extends State<BookmarkCard> {
     return AnimatedSize(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
-      child: SwipeableTile.card(
-        shadow: BoxShadow(color: context.colors.error),
-        borderRadius: 12,
-        horizontalPadding: horizontalScreenPadding,
-        verticalPadding: 7,
-        key: widget.key!,
-        color: Colors.transparent,
-        swipeThreshold: 0.4,
-        direction: SwipeDirection.endToStart,
-        onSwiped: (direction) {
-          context.read<BookmarkReviewBloc>().add(
-            BookmarkReviewBookmarkRemoved(bookmark: widget.bookmark),
-          );
-          showSuccessSnackBar();
-        },
-        backgroundBuilder: (context, direction, progress) {
-          return Container(
-            alignment: Alignment.center,
-            color: context.colors.error,
-            child: ListTile(
-              trailing: Icon(Icons.delete, color: context.colors.onError),
-            ),
-          );
-        },
-        child: Material(
-          color: !widget.isAnswerVisible
-              ? context.colors.primaryContainer
-              : context.colors.secondaryContainer,
-          borderRadius: BorderRadius.circular(12),
-          elevation: 0,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: _toggle,
-            child: Ink(
-              padding: const EdgeInsets.all(20),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: minHeight ?? 0,
-                  minWidth: double.infinity,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      plainCardText(
-                        widget.isAnswerVisible
-                            ? widget.bookmark.answer
-                            : widget.bookmark.question,
-                      ),
-                      key: widget.isAnswerVisible ? null : _textKey,
-                      style: textStyle,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: horizontalScreenPadding,
+          vertical: 7,
+        ),
+        child: Stack(
+          children: [
+            Material(
+              color: !widget.isAnswerVisible
+                  ? context.colors.primaryContainer
+                  : context.colors.secondaryContainer,
+              borderRadius: BorderRadius.circular(12),
+              elevation: 0,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: _toggle,
+                child: Ink(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 40, 20),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: minHeight ?? 0,
+                      minWidth: double.infinity,
                     ),
-                    if (widget.isAnswerVisible)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 15),
-                        child: Column(
-                          children: card
-                              .buildCardInfoItems()
-                              .map((item) => CardMetaRowFullWidth(item: item))
-                              .toList(),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          plainCardText(
+                            widget.isAnswerVisible
+                                ? widget.bookmark.answer
+                                : widget.bookmark.question,
+                          ),
+                          key: widget.isAnswerVisible ? null : _textKey,
+                          style: textStyle,
                         ),
-                      ),
-                  ],
+                        if (widget.isAnswerVisible)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 15),
+                            child: Column(
+                              children: card
+                                  .buildCardInfoItems()
+                                  .map(
+                                    (item) => CardMetaRowFullWidth(item: item),
+                                  )
+                                  .toList(),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: PopupMenuButton<_BookmarkAction>(
+                tooltip: 'Bookmark options',
+                icon: Icon(
+                  Icons.more_vert,
+                  color: !widget.isAnswerVisible
+                      ? context.colors.onPrimaryContainer
+                      : context.colors.onSecondaryContainer,
+                ),
+                onSelected: (action) {
+                  switch (action) {
+                    case _BookmarkAction.addToSet:
+                      showAddToSetSheet(context, widget.bookmark.flashcardId);
+                    case _BookmarkAction.remove:
+                      remove();
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: _BookmarkAction.addToSet,
+                    child: ListTile(
+                      leading: Icon(Icons.playlist_add),
+                      title: Text('Add to set…'),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _BookmarkAction.remove,
+                    child: ListTile(
+                      leading: Icon(Icons.bookmark_remove_outlined),
+                      title: Text('Remove bookmark'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
+
+enum _BookmarkAction { addToSet, remove }

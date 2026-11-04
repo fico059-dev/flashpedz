@@ -88,7 +88,7 @@ class _IgnoredCardsView extends StatelessWidget {
                         SizedBox(height: 7),
                         CardFactory.info(
                           title: Text("Unignore flashcard"),
-                          subtitle: Text("Swipe left to unignore flashcard"),
+                          subtitle: Text("Tap ⋮ on a card to unignore it"),
                           closable: true,
                         ),
                         SizedBox(height: 15),
@@ -179,7 +179,7 @@ class _ContentState extends State<_Content> {
                 SizedBox(height: 7),
                 CardFactory.info(
                   title: Text("Unignore flashcard"),
-                  subtitle: Text("Swipe left to unignore flashcard"),
+                  subtitle: Text("Tap ⋮ on a card to unignore it"),
                   closable: true,
                 ),
                 SizedBox(height: 15),

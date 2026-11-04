@@ -909,7 +909,7 @@ abstract class AppLocalizations {
   /// No description provided for @reviewBookmarkPage_swipe.
   ///
   /// In en, this message translates to:
-  /// **'Swipe left to remove bookmark'**
+  /// **'Tap ⋮ on a card to remove its bookmark or add it to a set'**
   String get reviewBookmarkPage_swipe;
 
   /// No description provided for @osceListPage_title.

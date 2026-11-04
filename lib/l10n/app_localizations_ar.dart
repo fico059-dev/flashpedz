@@ -469,7 +469,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get reviewBookmarkPage_remove => 'Remove bookmark';
 
   @override
-  String get reviewBookmarkPage_swipe => 'Swipe left to remove bookmark';
+  String get reviewBookmarkPage_swipe => 'Tap ⋮ on a card to remove its bookmark or add it to a set';
 
   @override
   String get osceListPage_title => 'OSCEs';
