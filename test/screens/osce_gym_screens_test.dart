@@ -112,4 +112,30 @@ void main() {
       });
     });
   }
+
+  testWidgets('the OSCE tab shows the latest arms; tap opens the gym', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightThemeData,
+        home: Scaffold(body: OsceGymStrip(load: () async => _stats())),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Your OSCE gym'), findsOneWidget);
+    // The latest 8 of 14 sessions.
+    expect(
+      find.descendant(
+        of: find.byType(OsceGymStrip),
+        matching: find.byWidgetPredicate(
+          (w) => w is CustomPaint && w.painter is ArmPainter,
+        ),
+      ),
+      findsNWidgets(8),
+    );
+    await tester.tap(find.text('Your OSCE gym'));
+    await tester.pumpAndSettle();
+    expect(find.text('Each arm is one OSCE session'), findsOneWidget);
+  });
 }

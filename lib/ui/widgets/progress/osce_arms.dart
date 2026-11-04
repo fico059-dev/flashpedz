@@ -41,6 +41,110 @@ List<OsceSession> osceSessions(OsceProgressStats stats) => [
       OsceSession(station.name, attempt.date, attempt.percent),
 ]..sort((a, b) => a.date.compareTo(b.date));
 
+/// The latest OSCE sessions as small arms, at the top of the OSCE tab.
+/// Tapping it opens the whole gym.
+class OsceGymStrip extends StatefulWidget {
+  /// Loads the OSCE results; null leaves the strip out.
+  final Future<OsceProgressStats?> Function() load;
+
+  const OsceGymStrip({super.key, required this.load});
+
+  @override
+  State<OsceGymStrip> createState() => _OsceGymStripState();
+}
+
+class _OsceGymStripState extends State<OsceGymStrip> {
+  OsceProgressStats? _stats;
+
+  @override
+  void initState() {
+    super.initState();
+    widget
+        .load()
+        .then((stats) {
+          if (mounted) setState(() => _stats = stats);
+        })
+        .catchError((Object _) {});
+  }
+
+  void _openGym(OsceProgressStats stats) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+          child: OsceGymCard(stats: stats),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = _stats;
+    if (stats == null) return const SizedBox.shrink();
+    final sessions = osceSessions(stats);
+    final latest = sessions.reversed.take(8).toList().reversed.toList();
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: const Color(0xFFE3F0FB),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _openGym(stats),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+          child: Row(
+            children: [
+              const Icon(Icons.fitness_center, color: Color(0xFF1E3A5F)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Your OSCE gym',
+                      style: context.text.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1E3A5F),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (latest.isEmpty)
+                      Text(
+                        'Finish a station to grow your first arm.',
+                        style: context.text.bodySmall?.copyWith(
+                          color: const Color(0xFF1E3A5F),
+                        ),
+                      )
+                    else
+                      SizedBox(
+                        height: 40,
+                        child: Row(
+                          children: [
+                            for (final session in latest)
+                              SizedBox.square(
+                                dimension: 40,
+                                child: CustomPaint(
+                                  painter: ArmPainter(session.level),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Color(0xFF1E3A5F)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// The OSCE gym: an arm per OSCE session, stronger with better scores, or
 /// colored squares.
 class OsceGymCard extends StatefulWidget {

@@ -12,6 +12,9 @@ import 'package:flashcards/ui/widgets/osce/osce_ui_card.dart';
 import 'package:flashcards/utils/firebase_error_mapper.dart';
 import 'package:flashcards/utils/result.dart';
 import 'package:flashcards/utils/util_functions.dart';
+import 'package:flashcards/data/repositories/progress/progress_repository.dart';
+import 'package:flashcards/domain/models/progress/osce_progress.dart';
+import 'package:flashcards/ui/widgets/progress/osce_arms.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -134,6 +137,15 @@ class OsceLibraryViewState extends State<OsceLibraryView> {
               _FolderHeader(
                 path: library.path(folderId).map((f) => f.name).toList(),
                 onBack: _back,
+              ),
+            if (folderId == null)
+              OsceGymStrip(
+                load: () async {
+                  final result = await context
+                      .read<ProgressRepository>()
+                      .getOsceStats();
+                  return result is Ok<OsceProgressStats> ? result.value : null;
+                },
               ),
             _RandomButton(
               total: total,
