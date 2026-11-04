@@ -27,6 +27,7 @@ import 'package:flashcards/ui/widgets/flashcard/flashcard_test/main_card/main_ca
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/next_button/next_button_with_session_bloc.dart';
 import 'package:flashcards/utils/firebase_error_mapper.dart';
 import 'package:flashcards/ui/widgets/rewards/study_rewards_widgets.dart';
+import 'package:flashcards/ui/widgets/flashcard/picture_hint.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fsrs/fsrs.dart' as fsrs;
@@ -268,32 +269,54 @@ class _ViewState extends State<_View> {
   }
 }
 
-class _LoadedContent extends StatelessWidget {
+class _LoadedContent extends StatefulWidget {
   final SessionTestLoaded state;
 
-  const _LoadedContent({super.key, required this.state});
+  const _LoadedContent({required this.state});
+
+  @override
+  State<_LoadedContent> createState() => _LoadedContentState();
+}
+
+class _LoadedContentState extends State<_LoadedContent> {
+  final _cardScroll = ScrollController();
+
+  @override
+  void dispose() {
+    _cardScroll.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final state = widget.state;
+    final card = state.statRecord.flashcard;
     return Column(
       children: [
         // Pinned: stays at the top while the card scrolls.
         TopRowWithSessionBloc(),
         Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                QuestionContainerWithSessionBloc(),
-                MainCardWithSessionBloc(),
+          child: PictureHint(
+            pictureUrls: card == null || state.status.isNoFlashcard
+                ? const []
+                : cardPictureUrls(card, answerShown: state.answerShown),
+            controller: _cardScroll,
+            child: SingleChildScrollView(
+              controller: _cardScroll,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  QuestionContainerWithSessionBloc(),
+                  MainCardWithSessionBloc(),
 
-                SizedBox(height: 40),
-                MainButtonWithSessionBloc(),
-                SizedBox(height: 40),
+                  SizedBox(height: 40),
+                  MainButtonWithSessionBloc(),
+                  SizedBox(height: 40),
 
-                AnswerWithSessionBloc(),
-                SizedBox(height: 15),
-              ],
+                  AnswerWithSessionBloc(),
+                  SizedBox(height: 15),
+                ],
+              ),
             ),
           ),
         ),

@@ -32,6 +32,7 @@ import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/timer_container.dart';
 import 'package:flashcards/utils/firebase_error_mapper.dart';
 import 'package:flashcards/ui/widgets/rewards/study_rewards_widgets.dart';
+import 'package:flashcards/ui/widgets/flashcard/picture_hint.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fsrs/fsrs.dart' as fsrs;
@@ -90,6 +91,7 @@ class _FlashcardViewState extends State<_FlashcardView> {
   }
 
   final _subscriptions = <StreamSubscription<Object>>[];
+  final _cardScroll = ScrollController();
 
   @override
   void initState() {
@@ -124,6 +126,7 @@ class _FlashcardViewState extends State<_FlashcardView> {
     for (final subscription in _subscriptions) {
       subscription.cancel();
     }
+    _cardScroll.dispose();
     super.dispose();
   }
 
@@ -205,25 +208,45 @@ class _FlashcardViewState extends State<_FlashcardView> {
                                 SizedBox(height: 4),
                                 TopRowWithFlashcardBloc(),
                                 Expanded(
-                                  child: SingleChildScrollView(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        QuestionContainerWithFlashcardBloc(),
-                                        MainCardWithFlashcardBloc(
-                                          onStart: _onStart,
+                                  child:
+                                      BlocSelector<
+                                        FlashcardBloc,
+                                        FlashcardState,
+                                        List<String>
+                                      >(
+                                        selector: (state) =>
+                                            state.flashcard == null
+                                            ? const []
+                                            : cardPictureUrls(
+                                                state.flashcard!,
+                                                answerShown:
+                                                    state.answerVisible,
+                                              ),
+                                        builder: (context, pictures) => PictureHint(
+                                          pictureUrls: pictures,
+                                          controller: _cardScroll,
+                                          child: SingleChildScrollView(
+                                            controller: _cardScroll,
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                QuestionContainerWithFlashcardBloc(),
+                                                MainCardWithFlashcardBloc(
+                                                  onStart: _onStart,
+                                                ),
+
+                                                SizedBox(height: 40),
+                                                MainButtonWithFlashcardBloc(),
+                                                SizedBox(height: 40),
+
+                                                FlashcardAnswerWithFlashcardBloc(),
+                                                SizedBox(height: 15),
+                                              ],
+                                            ),
+                                          ),
                                         ),
-
-                                        SizedBox(height: 40),
-                                        MainButtonWithFlashcardBloc(),
-                                        SizedBox(height: 40),
-
-                                        FlashcardAnswerWithFlashcardBloc(),
-                                        SizedBox(height: 15),
-                                      ],
-                                    ),
-                                  ),
+                                      ),
                                 ),
 
                                 SafeArea(
