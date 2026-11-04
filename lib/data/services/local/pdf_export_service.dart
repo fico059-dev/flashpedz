@@ -277,6 +277,102 @@ class PdfExportService {
   );
 
   /// Opens the share sheet on phones and downloads the file on the website.
+  /// The student's highlights: one section per pack, each card's question
+  /// with the passages highlighted on it.
+  Future<Uint8List> generateHighlightsPdf({
+    required String filterLabel,
+    required List<HighlightPdfSection> sections,
+    DateTime? date,
+  }) async {
+    final pdf = pw.Document(theme: _theme);
+    const muted = PdfColor.fromInt(0xFF616161);
+    const mark = PdfColor.fromInt(0xFFFFF3B0);
+    const markEdge = PdfColor.fromInt(0xFFE0B400);
+    final day = date ?? DateTime.now();
+    final dateText =
+        '${day.day.toString().padLeft(2, '0')}/'
+        '${day.month.toString().padLeft(2, '0')}/${day.year}';
+    final total = sections.fold<int>(
+      0,
+      (sum, s) => sum + s.cards.fold<int>(0, (n, c) => n + c.passages.length),
+    );
+
+    pdf.addPage(
+      pw.MultiPage(
+        margin: const pw.EdgeInsets.all(36),
+        header: (context) => context.pageNumber == 1
+            ? pw.SizedBox()
+            : pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(
+                  'FlashPedz highlights',
+                  style: const pw.TextStyle(fontSize: 9, color: muted),
+                ),
+              ),
+        footer: (context) => pw.Align(
+          alignment: pw.Alignment.centerRight,
+          child: pw.Text(
+            '${context.pageNumber} / ${context.pagesCount}',
+            style: const pw.TextStyle(fontSize: 9, color: muted),
+          ),
+        ),
+        build: (context) => [
+          pw.Text(
+            'My highlights',
+            style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            '$filterLabel  ·  $total highlights  ·  $dateText',
+            style: const pw.TextStyle(fontSize: 11, color: muted),
+          ),
+          pw.SizedBox(height: 16),
+          for (final section in sections) ...[
+            pw.Header(
+              level: 1,
+              text: section.title,
+              textStyle: pw.TextStyle(
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            for (final card in section.cards)
+              pw.Container(
+                margin: const pw.EdgeInsets.only(bottom: 12),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      card.question,
+                      style: const pw.TextStyle(fontSize: 10, color: muted),
+                    ),
+                    pw.SizedBox(height: 4),
+                    for (final passage in card.passages)
+                      pw.Container(
+                        width: double.infinity,
+                        margin: const pw.EdgeInsets.only(bottom: 4),
+                        padding: const pw.EdgeInsets.fromLTRB(8, 5, 8, 5),
+                        decoration: const pw.BoxDecoration(
+                          color: mark,
+                          border: pw.Border(
+                            left: pw.BorderSide(color: markEdge, width: 3),
+                          ),
+                        ),
+                        child: pw.Text(
+                          passage,
+                          style: const pw.TextStyle(fontSize: 12),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+    return pdf.save();
+  }
+
   Future<void> sharePdf(Uint8List pdfBytes, String filename) async {
     await Printing.sharePdf(bytes: pdfBytes, filename: '$filename.pdf');
   }
@@ -293,4 +389,20 @@ String pdfFileName(String name) {
       .trim()
       .replaceAll(RegExp(r'\s+'), '_');
   return cleaned.isEmpty ? 'OSCE' : cleaned;
+}
+
+/// A pack's (or another group's) part of the highlights PDF.
+class HighlightPdfSection {
+  final String title;
+  final List<HighlightPdfCard> cards;
+
+  const HighlightPdfSection(this.title, this.cards);
+}
+
+/// A card's question and the passages highlighted on it.
+class HighlightPdfCard {
+  final String question;
+  final List<String> passages;
+
+  const HighlightPdfCard(this.question, this.passages);
 }

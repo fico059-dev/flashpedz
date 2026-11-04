@@ -7,6 +7,7 @@ import 'package:flashcards/domain/models/flashcards/highlight/highlight.dart';
 import 'package:flashcards/ui/theme/theme_extensions.dart';
 import 'package:flashcards/ui/widgets/core/images/image_preview.dart';
 import 'package:flashcards/ui/widgets/notebook/highlightable_text.dart';
+import 'package:flashcards/ui/dialogs/notebook/export_highlights_sheet.dart';
 import 'package:flashcards/utils/firebase_error_mapper.dart';
 import 'package:flashcards/utils/result.dart';
 import 'package:flutter/material.dart';
@@ -108,17 +109,30 @@ class _HighlightsListState extends State<HighlightsList> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
-              TextField(
-                onChanged: (value) => setState(() => _query = value),
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search),
-                  hintText:
-                      'Search ${repo.notebookHighlights.length} highlights',
-                  isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      onChanged: (value) => setState(() => _query = value),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search),
+                        hintText:
+                            'Search ${repo.notebookHighlights.length} highlights',
+                        isDense: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    tooltip: 'Export as PDF',
+                    onPressed: () =>
+                        showExportHighlightsSheet(context, repo.highlights),
+                    icon: const Icon(Icons.picture_as_pdf_outlined),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               if (groups.isEmpty)
