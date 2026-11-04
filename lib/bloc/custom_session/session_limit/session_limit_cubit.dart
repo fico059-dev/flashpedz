@@ -40,6 +40,7 @@ class SessionLimitCubit extends Cubit<SessionLimitState> {
     String? name,
     List<String> topics = const [],
     List<String> excludeTags = const [],
+    String? studied,
   }) async {
     final state = this.state;
     if (state is! SessionLimitLoaded) return;
@@ -64,6 +65,7 @@ class SessionLimitCubit extends Cubit<SessionLimitState> {
       name: name,
       topics: topics,
       excludeTags: excludeTags,
+      studied: studied,
     );
     switch (result) {
       case Error<void>(:final error):

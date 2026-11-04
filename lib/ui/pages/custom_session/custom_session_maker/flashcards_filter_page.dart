@@ -12,7 +12,9 @@ import 'package:flashcards/utils/firebase_error_mapper.dart';
 import 'package:flashcards/domain/models/flashcards/flashcard_filter_counts/pack_filter_counts.dart';
 import 'package:flashcards/ui/widgets/core/desktop_layout.dart';
 import 'package:flutter/material.dart';
+import 'package:flashcards/bloc/custom_session/studied_filter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 
 @RoutePage()
 class FlashcardsFilterPage extends StatefulWidget {
@@ -92,110 +94,149 @@ class _LoadedContent extends StatelessWidget {
       context.read<PackFilterBloc>().add(PackFilterSelected(filter: filter));
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        CardFactory.info(
-          title: Text("Select filter"),
-          subtitle: Text(
-            "Decide which type of cards you want to focus on "
-            "within the selected packs.",
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CardFactory.info(
+            title: Text("Select filter"),
+            subtitle: Text(
+              "Decide which type of cards you want to focus on "
+              "within the selected packs.",
+            ),
           ),
-        ),
 
-        SizedBox(height: 40),
+          SizedBox(height: 40),
 
-        Wrap(
-          spacing: 20,
-          runSpacing: 10,
-          children: [
-            ChoiceChip(
-              label: Text("All cards $allCount"),
-              selected: selected == PackSelectedFilter.all,
-              onSelected: (_) => selectOption(PackSelectedFilter.all),
-            ),
-            ChoiceChip(
-              label: Text("Unseen cards $unseenCount"),
-              selected: selected == PackSelectedFilter.unseen,
-              onSelected: unseenCount > 0
-                  ? (_) => selectOption(PackSelectedFilter.unseen)
-                  : null,
-            ),
-            ChoiceChip(
-              label: Text("Seen cards ${state.packFilterCounts.seenCount}"),
-              selected: selected == PackSelectedFilter.seen,
-              onSelected: seenCount > 0
-                  ? (_) => selectOption(PackSelectedFilter.seen)
-                  : null,
-            ),
-            ChoiceChip(
-              label: Text(
-                "Bookmarked ${state.packFilterCounts.bookmarkedCount}",
-              ),
-              selected: selected == PackSelectedFilter.bookmarked,
-              onSelected: bookmarkCount > 0
-                  ? (_) => selectOption(PackSelectedFilter.bookmarked)
-                  : null,
-            ),
-            ChoiceChip(
-              label: Text("Ignored ${state.packFilterCounts.ignoredCount}"),
-              selected: selected == PackSelectedFilter.ignored,
-              onSelected: ignoredCount > 0
-                  ? (_) => selectOption(PackSelectedFilter.ignored)
-                  : null,
-            ),
-          ],
-        ),
-
-        SizedBox(height: 40),
-
-        Text.rich(
-          TextSpan(
+          Wrap(
+            spacing: 20,
+            runSpacing: 10,
             children: [
-              TextSpan(text: "• "),
-              TextSpan(
-                text: "All Cards",
-                style: TextStyle(fontWeight: FontWeight.bold),
+              ChoiceChip(
+                label: Text("All cards $allCount"),
+                selected: selected == PackSelectedFilter.all,
+                onSelected: (_) => selectOption(PackSelectedFilter.all),
               ),
-              TextSpan(
-                text: " – Includes every card from the selected packs.\n",
+              ChoiceChip(
+                label: Text("Unseen cards $unseenCount"),
+                selected: selected == PackSelectedFilter.unseen,
+                onSelected: unseenCount > 0
+                    ? (_) => selectOption(PackSelectedFilter.unseen)
+                    : null,
               ),
-
-              TextSpan(text: "• "),
-              TextSpan(
-                text: "Unseen",
-                style: TextStyle(fontWeight: FontWeight.bold),
+              ChoiceChip(
+                label: Text("Seen cards ${state.packFilterCounts.seenCount}"),
+                selected: selected == PackSelectedFilter.seen,
+                onSelected: seenCount > 0
+                    ? (_) => selectOption(PackSelectedFilter.seen)
+                    : null,
               ),
-              TextSpan(
-                text:
-                    " – Cards you've never studied, in regular study or "
-                    "an exam.\n",
+              ChoiceChip(
+                label: Text(
+                  "Bookmarked ${state.packFilterCounts.bookmarkedCount}",
+                ),
+                selected: selected == PackSelectedFilter.bookmarked,
+                onSelected: bookmarkCount > 0
+                    ? (_) => selectOption(PackSelectedFilter.bookmarked)
+                    : null,
               ),
-
-              TextSpan(text: "• "),
-              TextSpan(
-                text: "Seen",
-                style: TextStyle(fontWeight: FontWeight.bold),
+              ChoiceChip(
+                label: Text("Ignored ${state.packFilterCounts.ignoredCount}"),
+                selected: selected == PackSelectedFilter.ignored,
+                onSelected: ignoredCount > 0
+                    ? (_) => selectOption(PackSelectedFilter.ignored)
+                    : null,
               ),
-              TextSpan(text: " – Only cards you've already encountered.\n"),
-
-              TextSpan(text: "• "),
-              TextSpan(
-                text: "Bookmarked",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              TextSpan(text: " – Cards you've marked as important.\n"),
-
-              TextSpan(text: "• "),
-              TextSpan(
-                text: "Ignored",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              TextSpan(text: " – Cards you've previously marked to avoid."),
             ],
           ),
-        ),
-      ],
+
+          if (selected == PackSelectedFilter.seen) const _StudiedChoice(),
+
+          SizedBox(height: 40),
+
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(text: "• "),
+                TextSpan(
+                  text: "All Cards",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                TextSpan(
+                  text: " – Includes every card from the selected packs.\n",
+                ),
+
+                TextSpan(text: "• "),
+                TextSpan(
+                  text: "Unseen",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                TextSpan(
+                  text:
+                      " – Cards you've never studied, in regular study or "
+                      "an exam.\n",
+                ),
+
+                TextSpan(text: "• "),
+                TextSpan(
+                  text: "Seen",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                TextSpan(text: " – Only cards you've already encountered.\n"),
+
+                TextSpan(text: "• "),
+                TextSpan(
+                  text: "Bookmarked",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                TextSpan(text: " – Cards you've marked as important.\n"),
+
+                TextSpan(text: "• "),
+                TextSpan(
+                  text: "Ignored",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                TextSpan(text: " – Cards you've previously marked to avoid."),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// For seen cards: all of them, or only those to work on.
+class _StudiedChoice extends StatelessWidget {
+  const _StudiedChoice();
+
+  @override
+  Widget build(BuildContext context) {
+    final notifier = context.watch<StudiedFilterNotifier>();
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Which studied cards?', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              for (final option in StudiedCardsFilter.values)
+                ChoiceChip(
+                  label: Text(option.label),
+                  selected: notifier.value == option,
+                  onSelected: (_) => notifier.value = option,
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(notifier.value.description, style: theme.textTheme.bodySmall),
+        ],
+      ),
     );
   }
 }

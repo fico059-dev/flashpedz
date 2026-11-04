@@ -89,12 +89,14 @@ class CustomSessionService {
     CreateCustomSessionRequestDto request, {
     List<String> topics = const [],
     List<String> excludeTags = const [],
+    String? studied,
   }) async {
     try {
       await _functions.createCustomSession(
         request,
         topics: topics,
         excludeTags: excludeTags,
+        studied: studied,
       );
       //final data = result.data as List<dynamic>;
 

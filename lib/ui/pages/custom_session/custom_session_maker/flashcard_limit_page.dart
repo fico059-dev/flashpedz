@@ -17,6 +17,7 @@ import 'package:flashcards/ui/widgets/core/tag_chip.dart';
 import 'package:flashcards/utils/firebase_error_mapper.dart';
 import 'package:flashcards/ui/widgets/core/desktop_layout.dart';
 import 'package:flutter/material.dart';
+import 'package:flashcards/bloc/custom_session/studied_filter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 @RoutePage()
@@ -89,9 +90,9 @@ class _FlashcardLimitPageState extends State<FlashcardLimitPage> {
               );
               return;
             case SessionLimitStatus.success:
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Exam created")),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text("Exam created")));
               context.router.parent()?.pop();
               return;
             default:
@@ -161,6 +162,9 @@ class _LoadedContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final picked = context.read<SessionTagPickerCubit>().state;
+    final studied = filter == PackSelectedFilter.seen
+        ? context.read<StudiedFilterNotifier>().value
+        : StudiedCardsFilter.all;
     final topics = picked.selectedTopics;
     final excluded = picked.excludedTags;
     final defaultName = defaultSessionName(
@@ -179,6 +183,7 @@ class _LoadedContent extends StatelessWidget {
         selectedTags: selectedTags.toIdList(),
         topics: topics,
         excludeTags: excluded,
+        studied: studied.requestValue,
         name: typedName.isEmpty ? defaultName : typedName,
       );
     }
@@ -239,7 +244,9 @@ class _LoadedContent extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Text(
-            filter.label,
+            studied == StudiedCardsFilter.all
+                ? filter.label
+                : '${filter.label}: ${studied.label}',
             style: Theme.of(context).textTheme.bodyLarge,
           ),
         ),

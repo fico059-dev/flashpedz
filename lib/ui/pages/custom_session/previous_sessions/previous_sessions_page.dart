@@ -179,9 +179,9 @@ class _ViewState extends State<_View> {
         listener: (context, state) {
           switch (state.status) {
             case CustomSessionGetterStatus.deleteSuccessful:
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Exam deleted")),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text("Exam deleted")));
               break;
             case CustomSessionGetterStatus.renameSuccessful:
               ScaffoldMessenger.of(
@@ -189,9 +189,9 @@ class _ViewState extends State<_View> {
               ).showSnackBar(SnackBar(content: Text("Exam renamed")));
               break;
             case CustomSessionGetterStatus.resetSuccessful:
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Exam progress reset")),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text("Exam progress reset")));
               break;
             case CustomSessionGetterStatus.actionError:
               ScaffoldMessenger.of(context).showSnackBar(
@@ -278,7 +278,9 @@ class _EmptyListContainer extends StatelessWidget {
       child: Column(
         spacing: 15,
         children: [
-          Text("You haven't made an exam yet. Pick packs, topics and tags, and test yourself."),
+          Text(
+            "You haven't made an exam yet. Pick packs, topics and tags, and test yourself.",
+          ),
 
           FilledButton(
             onPressed: () =>

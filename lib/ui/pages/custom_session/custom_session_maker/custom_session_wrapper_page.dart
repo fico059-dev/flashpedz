@@ -9,7 +9,9 @@ import 'package:flashcards/data/repositories/flashcards/pack_repository.dart';
 import 'package:flashcards/ui/widgets/custom_session/custom_session_bottom_navigation_bar.dart';
 import 'package:flashcards/ui/widgets/core/desktop_layout.dart';
 import 'package:flutter/material.dart';
+import 'package:flashcards/bloc/custom_session/studied_filter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 
 @RoutePage()
 class CustomSessionWrapperPage extends StatelessWidget
@@ -45,6 +47,7 @@ class CustomSessionWrapperPage extends StatelessWidget
               PackFilterBloc(fcpRepo: context.read<FcpRepository>()),
         ),
         BlocProvider(create: (context) => SessionTagPickerCubit()),
+        ChangeNotifierProvider(create: (context) => StudiedFilterNotifier()),
         BlocProvider(
           create: (context) => SessionLimitCubit(
             customSessionRepo: context.read<CustomSessionRepository>(),

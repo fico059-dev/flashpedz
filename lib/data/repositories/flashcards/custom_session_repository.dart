@@ -77,6 +77,7 @@ class CustomSessionRepository {
     String? name,
     List<String> topics = const [],
     List<String> excludeTags = const [],
+    String? studied,
   }) async {
     final request = CreateCustomSessionRequestDto(
       profileId: _getUid(),
@@ -90,6 +91,7 @@ class CustomSessionRepository {
       request,
       topics: topics,
       excludeTags: excludeTags,
+      studied: studied,
     );
   }
 

@@ -26,7 +26,48 @@ type RequstDataDto = {
   topics?: string[];
   /** Cards with any of these tags are left out. */
   excludeTags?: string[];
+  /** Which studied cards: "forgotten", "hard" or "due" (all when unset). */
+  studied?: string;
 };
+
+type FsrsCardData = {
+  lapses?: number;
+  difficulty?: number;
+  state?: string;
+  due?: {toDate: () => Date} | Date;
+};
+
+/** FSRS difficulty (1 to 10) from which a card counts as hard for the student. */
+export const hardDifficulty = 7;
+
+/**
+ * Whether a studied card is one the student asked to review: forgotten
+ * (answered Again at least once), hard for them, or due now.
+ * @param {FsrsCardData | undefined} card The card's FSRS progress.
+ * @param {string | undefined} studied The choice; anything else keeps all.
+ * @param {Date} now The current time.
+ * @return {boolean} Whether to keep the card.
+ */
+export function matchesStudied(
+  card: FsrsCardData | undefined,
+  studied: string | undefined,
+  now: Date,
+): boolean {
+  switch (studied) {
+  case "forgotten":
+    return (card?.lapses ?? 0) > 0 || card?.state === "relearning";
+  case "hard":
+    return (card?.difficulty ?? 0) >= hardDifficulty;
+  case "due": {
+    const due = card?.due;
+    if (!due) return false;
+    const date = due instanceof Date ? due : due.toDate();
+    return date.getTime() <= now.getTime();
+  }
+  default:
+    return true;
+  }
+}
 
 /**
  * Keeps the cards that have one of the topics and none of the excluded
@@ -118,6 +159,8 @@ type FlashcardSnapshot = {
   question: string;
   answer: string;
   tags: string[];
+  /** The student's progress, for cards they studied. */
+  fsrs?: FsrsCardData;
 };
 
 export async function createCustomSessionHandler(request: CallableRequest) {
@@ -132,6 +175,7 @@ export async function createCustomSessionHandler(request: CallableRequest) {
     const matchAllTags = (data as RequstDataDto).matchAllTags === true;
     const topics = stringList((data as RequstDataDto).topics);
     const excludeTags = stringList((data as RequstDataDto).excludeTags);
+    const studied = (data as RequstDataDto).studied;
 
     if (!profileId || !filter || !packIds || !tags || !sessionSize) {
       const missingParams = getMissingParams({
@@ -197,11 +241,12 @@ export async function createCustomSessionHandler(request: CallableRequest) {
       );
     }
 
-    const flashcardSnapshots = await getFlashcardsByFilter(
+    const now = new Date();
+    const flashcardSnapshots = (await getFlashcardsByFilter(
       filter,
       packIds,
       profileId,
-    );
+    )).filter((card) => !card.fsrs || matchesStudied(card.fsrs, studied, now));
     const filteredFlashcards = filterByTagsAndSlice(
       filterByTopicsAndExclusions(flashcardSnapshots, topics, excludeTags),
       tags,
@@ -367,6 +412,7 @@ export async function createCustomSessionHandler(request: CallableRequest) {
         question: fcSnapshot.question,
         answer: fcSnapshot.answer,
         tags: fcSnapshot.tags,
+        fsrs: doc.data().fsrs_card ?? {},
       } as FlashcardSnapshot;
     });
 

@@ -19,11 +19,13 @@ class CloudFunctionService {
     CreateCustomSessionRequestDto request, {
     List<String> topics = const [],
     List<String> excludeTags = const [],
+    String? studied,
   }) async {
     return await _functions.httpsCallable("createCustomSession").call({
       ...request.toJson(),
       if (topics.isNotEmpty) 'topics': topics,
       if (excludeTags.isNotEmpty) 'excludeTags': excludeTags,
+      'studied': ?studied,
     });
   }
 

@@ -184,12 +184,12 @@ class PackPickerBloc extends Bloc<PackPickerEvent, PackPickerState> {
     emit(
       state.copyWith(
         selectedPacksMap: updatedMap,
-        selectedCount:
-            isSelected ? state.selectedCount - 1 : state.selectedCount + 1,
-        flashcardSum:
-            isSelected
-                ? state.flashcardSum - fcCount
-                : state.flashcardSum + fcCount,
+        selectedCount: isSelected
+            ? state.selectedCount - 1
+            : state.selectedCount + 1,
+        flashcardSum: isSelected
+            ? state.flashcardSum - fcCount
+            : state.flashcardSum + fcCount,
       ),
     );
   }

@@ -55,7 +55,9 @@ class PackSelectionCard extends StatelessWidget {
               child: Text(
                 pack.packName,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: selected ? context.colors.primary : context.colors.onSurface,
+                  color: selected
+                      ? context.colors.primary
+                      : context.colors.onSurface,
                   fontWeight: selected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
@@ -70,9 +72,9 @@ class PackSelectionCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   "${pack.flashcardsCount}",
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: context.colors.onSurfaceVariant),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: context.colors.onSurfaceVariant,
+                  ),
                 ),
                 if (selected)
                   Padding(

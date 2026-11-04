@@ -11,6 +11,7 @@ import 'package:flashcards/domain/models/flashcards/flashcard_filter_counts/pack
 import 'package:flashcards/domain/models/flashcards/tag/tag.dart';
 import 'package:flashcards/ui/theme/theme_extensions.dart';
 import 'package:flutter/material.dart';
+import 'package:flashcards/bloc/custom_session/studied_filter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:percent_indicator/flutter_percent_indicator.dart';
 
@@ -73,7 +74,11 @@ class CustomSessionBottomNavigationBar extends StatelessWidget {
             packFilterCounts.getCountForFilter(selectedFilter),
             tagPickerState.maxCardsWithAllTags,
           ),
-          isCountExact: tagPickerState.isCountExact,
+          isCountExact:
+              tagPickerState.isCountExact &&
+              (selectedFilter != PackSelectedFilter.seen ||
+                  context.read<StudiedFilterNotifier>().value ==
+                      StudiedCardsFilter.all),
           selectedPacks: selectedPacks,
           selectedTags: tagPickerState.selectedTagsObject,
         ),
