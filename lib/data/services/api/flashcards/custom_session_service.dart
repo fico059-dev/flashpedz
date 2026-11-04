@@ -34,24 +34,33 @@ class CustomSessionService {
     required int limit,
   }) async {
     try {
-      var query = _customSessions
-          .orderBy('createdAt', descending: true)
-          .where('profileId', isEqualTo: profileId)
-          .limit(limit);
-      if (startAfter != null) {
-        query = query.startAfterDocument(startAfter);
+      // Sessions of "My Sets" are shown with their set, not here. Pages are
+      // filled up so the list doesn't look finished early.
+      final dtoList = <CustomSessionDto>[];
+      DocumentSnapshot<JsonMap>? newest;
+      DocumentSnapshot? last = startAfter;
+      while (true) {
+        final wanted = limit - dtoList.length;
+        var query = _customSessions
+            .orderBy('createdAt', descending: true)
+            .where('profileId', isEqualTo: profileId)
+            .limit(wanted);
+        if (last != null) query = query.startAfterDocument(last);
+        final snapshot = await query.get();
+        dtoList.addAll(
+          snapshot.docs
+              .where((doc) => doc.data()['fromSet'] == null)
+              .map(
+                (doc) => CustomSessionDto.fromJsonWithId(doc.data(), doc.id),
+              ),
+        );
+        if (snapshot.docs.isNotEmpty) last = newest = snapshot.docs.last;
+        // Fewer documents than asked for: there are no more.
+        if (snapshot.docs.length < wanted || dtoList.length >= limit) break;
       }
 
-      final snapshot = await query.get();
-      final dtoList = snapshot.docs
-          .map((doc) => CustomSessionDto.fromJsonWithId(doc.data(), doc.id))
-          .toList();
-
       return Result.ok(
-        PaginatedDtoResult(
-          items: dtoList,
-          lastDocument: getLastDocFromSnapshot(snapshot),
-        ),
+        PaginatedDtoResult(items: dtoList, lastDocument: newest),
       );
     } on Exception catch (error) {
       return Result.error(error);

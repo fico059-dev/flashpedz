@@ -5,7 +5,6 @@ import 'package:flashcards/ui/theme/theme_extensions.dart';
 import 'package:flashcards/ui/widgets/core/subs_status_icon.dart';
 import 'package:flashcards/utils/util_functions.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:shimmer/shimmer.dart';
 
 class PreviousSessionCard extends StatelessWidget {
@@ -14,6 +13,8 @@ class PreviousSessionCard extends StatelessWidget {
   final VoidCallback? onDeletePressed;
   final VoidCallback? onResetPressed;
   final VoidCallback? onRenamePressed;
+  final VoidCallback? onBrowsePressed;
+  final VoidCallback? onSaveAsSetPressed;
   final bool? hasCards;
   final VoidCallback? onTap;
 
@@ -25,6 +26,8 @@ class PreviousSessionCard extends StatelessWidget {
     this.onDeletePressed,
     this.onResetPressed,
     this.onRenamePressed,
+    this.onBrowsePressed,
+    this.onSaveAsSetPressed,
     this.onTap,
   });
 
@@ -35,42 +38,8 @@ class PreviousSessionCard extends StatelessWidget {
 
     return Container(
       margin: EdgeInsets.only(bottom: 16),
-      child: Slidable(
-        key: ValueKey(session.id),
-        endActionPane: ActionPane(
-          extentRatio: 0.8,
-          // closeThreshold: 0.7,
-          // openThreshold: 0.3,
-          motion: const DrawerMotion(),
-          children: [
-            SlidableAction(
-              onPressed: (_) => onStartPressed?.call(),
-              backgroundColor: onStartPressed != null
-                  ? context.customColors.success
-                  : context.colors.outlineVariant,
-              foregroundColor: onStartPressed != null
-                  ? context.customColors.onSuccess
-                  : context.colors.onSurface,
-              icon: Icons.play_arrow,
-              label: 'Start',
-            ),
-            SlidableAction(
-              onPressed: (_) => onResetPressed?.call(),
-              backgroundColor: context.customColors.info,
-              foregroundColor: context.customColors.onInfo,
-              icon: Icons.refresh,
-              label: 'Reset',
-            ),
-            SlidableAction(
-              onPressed: (_) => onDeletePressed?.call(),
-              backgroundColor: context.colors.error,
-              foregroundColor: context.colors.onError,
-              icon: Icons.delete_forever,
-              label: 'Delete',
-            ),
-          ],
-        ),
-        child: Card(
+      child: Builder(
+        builder: (context) => Card(
           margin: EdgeInsets.all(0),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
@@ -107,6 +76,14 @@ class PreviousSessionCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        _SessionMenu(
+                          onStart: onStartPressed,
+                          onBrowse: onBrowsePressed,
+                          onSaveAsSet: onSaveAsSetPressed,
+                          onRename: onRenamePressed,
+                          onReset: onResetPressed,
+                          onDelete: onDeletePressed,
+                        ),
                       ],
                     ),
                   ),
@@ -117,7 +94,7 @@ class PreviousSessionCard extends StatelessWidget {
                     children: [
                       // Leaves room for the card count in the corner.
                       Padding(
-                        padding: const EdgeInsets.only(right: 110),
+                        padding: const EdgeInsets.only(right: 150),
                         child: Row(
                           children: [
                             Flexible(
@@ -184,6 +161,99 @@ class PreviousSessionCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+enum _SessionAction { start, browse, saveAsSet, rename, reset, delete }
+
+/// The session's options (instead of swiping the card).
+class _SessionMenu extends StatelessWidget {
+  final VoidCallback? onStart;
+  final VoidCallback? onBrowse;
+  final VoidCallback? onSaveAsSet;
+  final VoidCallback? onRename;
+  final VoidCallback? onReset;
+  final VoidCallback? onDelete;
+
+  const _SessionMenu({
+    this.onStart,
+    this.onBrowse,
+    this.onSaveAsSet,
+    this.onRename,
+    this.onReset,
+    this.onDelete,
+  });
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete this session?'),
+        content: const Text('Your card progress is kept.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) onDelete?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    PopupMenuItem<_SessionAction> item(
+      _SessionAction value,
+      IconData icon,
+      String label,
+      VoidCallback? action,
+    ) => PopupMenuItem(
+      value: value,
+      enabled: action != null,
+      child: ListTile(leading: Icon(icon), title: Text(label)),
+    );
+
+    return SizedBox(
+      width: 32,
+      height: 28,
+      child: PopupMenuButton<_SessionAction>(
+        tooltip: 'Session options',
+        padding: EdgeInsets.zero,
+        iconSize: 22,
+        icon: const Icon(Icons.more_vert),
+        onSelected: (action) => switch (action) {
+          _SessionAction.start => onStart?.call(),
+          _SessionAction.browse => onBrowse?.call(),
+          _SessionAction.saveAsSet => onSaveAsSet?.call(),
+          _SessionAction.rename => onRename?.call(),
+          _SessionAction.reset => onReset?.call(),
+          _SessionAction.delete => _confirmDelete(context),
+        },
+        itemBuilder: (context) => [
+          item(_SessionAction.start, Icons.play_arrow, 'Start', onStart),
+          item(
+            _SessionAction.browse,
+            Icons.view_list,
+            'Browse cards',
+            onBrowse,
+          ),
+          item(
+            _SessionAction.saveAsSet,
+            Icons.collections_bookmark_outlined,
+            'Save as set',
+            onSaveAsSet,
+          ),
+          item(_SessionAction.rename, Icons.edit_outlined, 'Rename', onRename),
+          item(_SessionAction.reset, Icons.refresh, 'Reset progress', onReset),
+          item(_SessionAction.delete, Icons.delete_outline, 'Delete', onDelete),
+        ],
       ),
     );
   }

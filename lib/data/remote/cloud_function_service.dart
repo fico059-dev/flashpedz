@@ -60,6 +60,46 @@ class CloudFunctionService {
     ];
   }
 
+  /// The student's sets ("My Sets").
+  Future<List<Map<String, dynamic>>> listCardSets() async {
+    final data = await _call('listCardSets', {});
+    return [
+      for (final item in data['sets'] as List? ?? const [])
+        Map<String, dynamic>.from(item as Map),
+    ];
+  }
+
+  /// Creates a set (no [id], with [flashcardIds] if given) or renames one.
+  /// Returns its id.
+  Future<String> saveCardSet({
+    String? id,
+    required String name,
+    List<String>? flashcardIds,
+  }) async {
+    final data = await _call('saveCardSet', {
+      'id': ?id,
+      'name': name,
+      'flashcardIds': ?flashcardIds,
+    });
+    return data['id'] as String;
+  }
+
+  Future<void> deleteCardSet(String id) => _call('deleteCardSet', {'id': id});
+
+  Future<void> setCardInSet({
+    required String setId,
+    required String flashcardId,
+    required bool inSet,
+  }) => _call('setCardInSet', {
+    'setId': setId,
+    'flashcardId': flashcardId,
+    'inSet': inSet,
+  });
+
+  /// Makes the set's study session; returns it.
+  Future<Map<String, dynamic>> studyCardSet(String setId) =>
+      _call('studyCardSet', {'setId': setId});
+
   /// Limits a pack to [emails] (empty: everyone). Returns the saved list.
   Future<List<String>> setPackAccess(String packId, List<String> emails) async {
     final data = await _call('setPackAccess', {

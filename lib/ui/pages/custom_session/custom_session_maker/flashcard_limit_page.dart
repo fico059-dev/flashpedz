@@ -265,8 +265,7 @@ class _LoadedContent extends StatelessWidget {
             spacing: 3,
             runSpacing: 3,
             children: [
-              for (final id in topics)
-                TagChip(label: Tag.fromId(id).topicName),
+              for (final id in topics) TagChip(label: Tag.fromId(id).topicName),
             ],
           ),
         ],

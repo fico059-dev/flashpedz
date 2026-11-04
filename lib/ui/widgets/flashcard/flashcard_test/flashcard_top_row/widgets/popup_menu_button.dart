@@ -6,6 +6,7 @@ enum Menu { ignore, report }
 class PopupMenuButtonTopRow extends StatelessWidget {
   final VoidCallback? onIgnore;
   final VoidCallback? onReport;
+  final VoidCallback? onAddToSet;
   final bool enabled;
 
   const PopupMenuButtonTopRow({
@@ -13,6 +14,7 @@ class PopupMenuButtonTopRow extends StatelessWidget {
     required this.onReport,
     required this.enabled,
     this.onIgnore,
+    this.onAddToSet,
   });
 
   @override
@@ -21,6 +23,18 @@ class PopupMenuButtonTopRow extends StatelessWidget {
       enabled: enabled,
       icon: Icon(Icons.more_vert, color: context.colors.primaryContainer),
       itemBuilder: (context) => <PopupMenuEntry<Menu>>[
+        if (onAddToSet != null)
+          PopupMenuItem(
+            onTap: onAddToSet,
+            child: ListTile(
+              leading: Icon(Icons.playlist_add, color: context.colors.primary),
+              title: Text("Add to set…"),
+              titleTextStyle: TextStyle(
+                fontWeight: FontWeight.normal,
+                color: context.colors.primary,
+              ),
+            ),
+          ),
         if (onIgnore != null)
           PopupMenuItem(
             onTap: () => _showIgnoreDialog(context, onIgnore!),

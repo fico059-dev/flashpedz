@@ -10,6 +10,7 @@ import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row/widgets/question_counter.dart';
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row/widgets/undo_button.dart';
 import 'package:flashcards/ui/dialogs/flashcard/share_card_dialog.dart';
+import 'package:flashcards/ui/dialogs/card_sets/card_set_dialogs.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -102,6 +103,9 @@ class TopRowWithSessionBloc extends StatelessWidget {
                 ),
 
                 PopupMenuButtonTopRow(
+                  onAddToSet: hasBookmark != null
+                      ? () => showAddToSetSheet(context, flashcard.id)
+                      : null,
                   onReport: hasBookmark != null
                       ? () => onReport(flashcard: flashcard)
                       : null,

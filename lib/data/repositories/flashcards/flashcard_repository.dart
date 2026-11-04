@@ -362,6 +362,24 @@ class FlashcardRepository {
     return Result.ok(flashcard);
   }
 
+  /// The cards with these ids, in the same order. Deleted cards (and ones
+  /// the student can't open) are left out.
+  Future<List<Flashcard>> getFlashcardsByIds(List<String> ids) async {
+    final results = <Flashcard?>[];
+    const parallel = 10;
+    for (var i = 0; i < ids.length; i += parallel) {
+      results.addAll(
+        await Future.wait(
+          ids.skip(i).take(parallel).map((id) async {
+            final result = await getFlashcard(id);
+            return result is Ok<Flashcard> ? result.value : null;
+          }),
+        ),
+      );
+    }
+    return results.nonNulls.toList();
+  }
+
   List<Flashcard>? getFlashcardPageFromCache({
     required String packId,
     required int pageIndex,

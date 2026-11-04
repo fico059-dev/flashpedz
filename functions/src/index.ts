@@ -24,6 +24,13 @@ import {
   saveHighlightHandler,
 } from "./handlers/highlights";
 import {
+  deleteCardSetHandler,
+  listCardSetsHandler,
+  saveCardSetHandler,
+  setCardInSetHandler,
+  studyCardSetHandler,
+} from "./handlers/cardSets";
+import {
   getStudyLogHandler,
   saveStudyLogHandler,
 } from "./handlers/studyLog";
@@ -80,6 +87,11 @@ export const renameCustomSession = onCall(renameCustomSessionHandler);
 export const saveHighlight = onCall(saveHighlightHandler);
 export const deleteHighlight = onCall(deleteHighlightHandler);
 export const listHighlights = onCall(listHighlightsHandler);
+export const listCardSets = onCall(listCardSetsHandler);
+export const saveCardSet = onCall(saveCardSetHandler);
+export const deleteCardSet = onCall(deleteCardSetHandler);
+export const setCardInSet = onCall(setCardInSetHandler);
+export const studyCardSet = onCall(studyCardSetHandler);
 export const saveStudyLog = onCall(saveStudyLogHandler);
 export const getStudyLog = onCall(getStudyLogHandler);
 export const setPackAccess = onCall(setPackAccessHandler);

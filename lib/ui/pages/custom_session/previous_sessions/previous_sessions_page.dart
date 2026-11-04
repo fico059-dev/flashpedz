@@ -12,6 +12,12 @@ import 'package:flashcards/ui/widgets/core/card_factory.dart';
 import 'package:flashcards/ui/widgets/core/error_screen.dart';
 import 'package:flashcards/ui/widgets/core/loading_overlay_listener.dart';
 import 'package:flashcards/ui/widgets/previous_sessions/previous_session_card.dart';
+import 'package:flashcards/data/repositories/flashcards/custom_session_repository.dart';
+import 'package:flashcards/ui/pages/card_browser/card_browser_page.dart';
+import 'package:flashcards/ui/widgets/card_sets/my_sets_section.dart';
+import 'package:flashcards/data/repositories/card_sets/card_set_repository.dart';
+import 'package:flashcards/ui/dialogs/card_sets/card_set_dialogs.dart';
+import 'package:flashcards/utils/result.dart';
 import 'package:flashcards/utils/firebase_error_mapper.dart';
 import 'package:flashcards/utils/util_functions.dart';
 import 'package:flashcards/ui/dialogs/previous_session/rename_session_dialog.dart';
@@ -82,6 +88,68 @@ class _ViewState extends State<_View> {
     context.router.push(CustomSessionTestRoute(sessionSummary: session));
   }
 
+  void onSessionBrowse(CustomSessionSummary session) {
+    final repo = context.read<CustomSessionRepository>();
+    openCardBrowser(
+      context,
+      title: session.displayName,
+      loadIds: () async {
+        final result = await repo.getCustomSessionFlashcardIds(
+          sessionSummary: session,
+        );
+        return switch (result) {
+          Ok(:final value) => value.flashcardIds,
+          Error(:final error) => throw error,
+        };
+      },
+      onStudy: session.isFinished
+          ? null
+          : (context) async => onSessionStart(session),
+    );
+  }
+
+  /// Keeps the session's cards as one of My Sets.
+  Future<void> onSessionSaveAsSet(CustomSessionSummary session) async {
+    final sets = context.read<CardSetRepository>();
+    final sessions = context.read<CustomSessionRepository>();
+    final messenger = ScaffoldMessenger.of(context);
+    await sets.load();
+    if (!mounted) return;
+    if (sets.isLoaded && !sets.canAddSet) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'You have $maxCardSets sets, the most. Delete one first.',
+          ),
+        ),
+      );
+      return;
+    }
+    final name = await showSetNameDialog(
+      context,
+      current: session.displayName,
+      title: 'Save as set',
+    );
+    if (name == null) return;
+    try {
+      final result = await sessions.getCustomSessionFlashcardIds(
+        sessionSummary: session,
+      );
+      final ids = switch (result) {
+        Ok(:final value) => value.flashcardIds,
+        Error(:final error) => throw error,
+      };
+      await sets.create(name, flashcardIds: ids);
+      messenger.showSnackBar(
+        SnackBar(content: Text('Saved "$name" with ${ids.length} cards')),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(extractErrorMessage(error))),
+      );
+    }
+  }
+
   void onSessionTap(CustomSessionSummary session) {
     showPrevSessionsOptionsBottomSheet(
       context: context,
@@ -144,19 +212,7 @@ class _ViewState extends State<_View> {
                       onRefresh: () => handleRefresh(context),
                       child: CustomScrollView(
                         slivers: [
-                          SliverToBoxAdapter(
-                            child: CardFactory.info(
-                              title: Text("Drag to left"),
-                              subtitle: Text(
-                                "Drag a custom session to the left for "
-                                "easy access to all of the options.",
-                              ),
-                              closable: true,
-                              isThreeLine: true,
-                            ),
-                          ),
-
-                          SliverToBoxAdapter(child: SizedBox(height: 15)),
+                          SliverToBoxAdapter(child: MySetsSection()),
 
                           PagedSliverList(
                             state: state.pagingState,
@@ -192,6 +248,10 @@ class _ViewState extends State<_View> {
                                       onSessionReset(session.id),
                                   onRenamePressed: () =>
                                       onSessionRename(session),
+                                  onBrowsePressed: () =>
+                                      onSessionBrowse(session),
+                                  onSaveAsSetPressed: () =>
+                                      onSessionSaveAsSet(session),
                                   onTap: () => onSessionTap(session),
                                 );
                               },

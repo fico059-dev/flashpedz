@@ -11,6 +11,7 @@ import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row/widgets/question_counter.dart';
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row/widgets/undo_button.dart';
 import 'package:flashcards/ui/dialogs/flashcard/share_card_dialog.dart';
+import 'package:flashcards/ui/dialogs/card_sets/card_set_dialogs.dart';
 import 'package:flashcards/ui/dialogs/flashcard/session_target_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -113,6 +114,9 @@ class TopRowWithFlashcardBloc extends StatelessWidget {
 
                 PopupMenuButtonTopRow(
                   onIgnore: onIgnore,
+                  onAddToSet: state.flashcard == null
+                      ? null
+                      : () => showAddToSetSheet(context, state.flashcard!.id),
                   onReport: () {
                     // In a pack with sub-packs, the card may be from one
                     // of the sub-packs.

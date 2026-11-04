@@ -23,7 +23,7 @@ class _PacksTabPageState extends State<PacksTabPage> {
               labelColor: Theme.of(context).colorScheme.primary,
               tabs: const [
                 Tab(text: 'All Packs'),
-                Tab(text: 'Custom Sessions'),
+                Tab(text: 'Sets & Sessions'),
                 Tab(text: 'Notebook'),
               ],
             ),
