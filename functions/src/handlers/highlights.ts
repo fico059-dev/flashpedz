@@ -15,6 +15,8 @@ type HighlightData = {
   text: string;
   start: number;
   question: string;
+  /** "underline" marks only show on the card, not in the notebook. */
+  kind: "highlight" | "underline";
 };
 
 /**
@@ -50,6 +52,7 @@ export function parseHighlight(data: unknown): HighlightData {
     text: str("text", maxTextLength),
     start,
     question: str("question", 300),
+    kind: d.kind === "underline" ? "underline" : "highlight",
   };
 }
 
@@ -118,6 +121,7 @@ export async function listHighlightsHandler(request: CallableRequest) {
           text: data.text,
           start: data.start ?? 0,
           question: data.question ?? "",
+          kind: data.kind === "underline" ? "underline" : "highlight",
           createdAt: (data.createdAt as Timestamp | undefined)?.toMillis() ?? 0,
         };
       }),

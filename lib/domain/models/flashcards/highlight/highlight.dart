@@ -1,5 +1,9 @@
 enum HighlightSide { question, answer }
 
+/// A yellow highlight (also listed in the notebook) or an underline, which
+/// only marks the card.
+enum HighlightKind { highlight, underline }
+
 /// A passage of a flashcard the student highlighted.
 class Highlight {
   final String id;
@@ -14,6 +18,7 @@ class Highlight {
   /// The card's question, to show where the highlight comes from.
   final String question;
   final DateTime createdAt;
+  final HighlightKind kind;
 
   const Highlight({
     required this.id,
@@ -24,7 +29,10 @@ class Highlight {
     required this.start,
     required this.question,
     required this.createdAt,
+    this.kind = HighlightKind.highlight,
   });
+
+  bool get isUnderline => kind == HighlightKind.underline;
 
   Highlight copyWith({String? id}) => Highlight(
     id: id ?? this.id,
@@ -35,6 +43,7 @@ class Highlight {
     start: start,
     question: question,
     createdAt: createdAt,
+    kind: kind,
   );
 
   Map<String, dynamic> toJson() => {
@@ -44,6 +53,7 @@ class Highlight {
     'text': text,
     'start': start,
     'question': question,
+    'kind': kind.name,
   };
 
   factory Highlight.fromJson(Map<String, dynamic> json) => Highlight(
@@ -59,6 +69,9 @@ class Highlight {
     createdAt: DateTime.fromMillisecondsSinceEpoch(
       (json['createdAt'] as num?)?.toInt() ?? 0,
     ),
+    kind: json['kind'] == 'underline'
+        ? HighlightKind.underline
+        : HighlightKind.highlight,
   );
 }
 
@@ -91,15 +104,20 @@ List<(int start, int end, Highlight highlight)> highlightRanges(
   }
   ranges.sort((a, b) => a.$1.compareTo(b.$1));
 
-  // Overlapping highlights are merged into one coloured stretch.
+  // Overlapping highlights (or underlines) are merged into one stretch.
   final merged = <(int, int, Highlight)>[];
-  for (final range in ranges) {
-    if (merged.isNotEmpty && range.$1 <= merged.last.$2) {
-      final last = merged.removeLast();
-      merged.add((last.$1, range.$2 > last.$2 ? range.$2 : last.$2, last.$3));
-    } else {
-      merged.add(range);
+  for (final kind in HighlightKind.values) {
+    final ofKind = <(int, int, Highlight)>[];
+    for (final range in ranges.where((r) => r.$3.kind == kind)) {
+      if (ofKind.isNotEmpty && range.$1 <= ofKind.last.$2) {
+        final last = ofKind.removeLast();
+        ofKind.add((last.$1, range.$2 > last.$2 ? range.$2 : last.$2, last.$3));
+      } else {
+        ofKind.add(range);
+      }
     }
+    merged.addAll(ofKind);
   }
+  merged.sort((a, b) => a.$1.compareTo(b.$1));
   return merged;
 }

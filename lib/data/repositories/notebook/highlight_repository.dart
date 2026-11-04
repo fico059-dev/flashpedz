@@ -21,8 +21,12 @@ class HighlightRepository extends ChangeNotifier {
   Object? loadError;
   int _tempIds = 0;
 
-  /// Newest first.
+  /// Newest first, highlights and underlines.
   List<Highlight> get highlights => _highlights;
+
+  /// What the notebook lists: highlights, not underlines.
+  List<Highlight> get notebookHighlights =>
+      _highlights.where((h) => !h.isUnderline).toList();
 
   bool get isLoaded => _loadedFor != null && _loadedFor == _uid;
 
@@ -64,6 +68,7 @@ class HighlightRepository extends ChangeNotifier {
     required String text,
     required int start,
     required String question,
+    HighlightKind kind = HighlightKind.highlight,
     void Function(Object error)? onError,
   }) {
     final local = Highlight(
@@ -75,6 +80,7 @@ class HighlightRepository extends ChangeNotifier {
       start: start,
       question: question,
       createdAt: DateTime.now(),
+      kind: kind,
     );
     _highlights = [local, ..._highlights];
     notifyListeners();

@@ -97,6 +97,15 @@ void main() {
       expect(highlightRanges(text, [_h('missing', 0)]), isEmpty);
     });
 
+    test('a selection cutting words is widened to whole words', () {
+      const text = 'Beta blockers or calcium';
+      expect(expandToWords(text, 1, 7), (0, 13));
+      expect(text.substring(0, 13), 'Beta blockers');
+      // Already on word edges: unchanged.
+      expect(expandToWords(text, 5, 13), (5, 13));
+      expect(expandToWords(text, 4, 6), (4, 13));
+    });
+
     test('merges overlapping highlights', () {
       final ranges = highlightRanges(text, [
         _h('Beta blockers', 0),
@@ -236,6 +245,56 @@ void main() {
     await tester.pumpAndSettle();
     expect(repo.highlights, hasLength(1));
     expect(repo.highlights.single.text, startsWith('Beta'));
+  });
+
+  testWidgets('underline marks the card but stays out of the notebook', (
+    tester,
+  ) async {
+    final functions = FakeHighlightFunctions();
+    final repo = _repo(functions);
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: repo,
+        child: MaterialApp(
+          theme: lightThemeData,
+          home: const Scaffold(
+            body: Center(
+              child: HighlightableText(
+                'Beta blockers or calcium channel blockers.',
+                target: _target,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.byType(SelectableText));
+    await tester.pumpAndSettle();
+    expect(find.text('Highlight'), findsOneWidget);
+    expect(find.text('Underline'), findsOneWidget);
+    await tester.tap(find.text('Underline'));
+    await tester.pumpAndSettle();
+
+    expect(repo.highlights.single.isUnderline, isTrue);
+    expect(functions.stored.single['kind'], 'underline');
+    expect(repo.notebookHighlights, isEmpty);
+    final span = tester.widget<SelectableText>(find.byType(SelectableText));
+    final underlined = span.textSpan!.children!.cast<TextSpan>().where(
+      (s) => s.style?.decorationColor == underlineColor,
+    );
+    expect(underlined.single.text, repo.highlights.single.text);
+    expect(underlined.single.style?.backgroundColor, isNull);
+
+    // The same words can be highlighted too; the menu offers both.
+    await tester.longPress(find.byType(SelectableText));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove underline'), findsOneWidget);
+    await tester.tap(find.text('Highlight'));
+    await tester.pumpAndSettle();
+    expect(repo.notebookHighlights, hasLength(1));
+    expect(repo.highlights, hasLength(2));
   });
 
   testWidgets('notebook lists highlights by card and searches', (tester) async {

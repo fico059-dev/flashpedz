@@ -80,7 +80,7 @@ class _HighlightsListState extends State<HighlightsList> {
             ),
           );
         }
-        if (repo.highlights.isEmpty) {
+        if (repo.notebookHighlights.isEmpty) {
           return const _Message(
             icon: Icons.format_color_text,
             title: 'No highlights yet',
@@ -93,8 +93,8 @@ class _HighlightsListState extends State<HighlightsList> {
 
         final query = _query.trim().toLowerCase();
         final filtered = query.isEmpty
-            ? repo.highlights
-            : repo.highlights
+            ? repo.notebookHighlights
+            : repo.notebookHighlights
                   .where(
                     (h) =>
                         h.text.toLowerCase().contains(query) ||
@@ -112,7 +112,8 @@ class _HighlightsListState extends State<HighlightsList> {
                 onChanged: (value) => setState(() => _query = value),
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.search),
-                  hintText: 'Search ${repo.highlights.length} highlights',
+                  hintText:
+                      'Search ${repo.notebookHighlights.length} highlights',
                   isDense: true,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
