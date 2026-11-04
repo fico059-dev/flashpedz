@@ -19,6 +19,7 @@ import 'dart:math' show Random;
 import 'package:flashcards/ui/widgets/home/card_garden.dart';
 import 'package:flashcards/ui/widgets/auth/social_sign_in_buttons.dart';
 import 'package:flashcards/ui/widgets/rewards/study_rewards_widgets.dart';
+import 'package:flashcards/ui/widgets/rewards/bird_badge.dart';
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/listeners/session_milestone_listener.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -139,8 +140,24 @@ void main() {
   testWidgets('level up', (tester) async {
     await setup(tester);
     await _app(tester, (_) => LevelUpDialog(level: LevelInfo.fromXp(1050)));
-    expect(find.textContaining('Intern'), findsOneWidget);
+    expect(find.text('You earned the Kingfisher'), findsOneWidget);
+    expect(find.text('Uncommon badge'), findsOneWidget);
     await _shot(tester, 'reward_level_up');
+  });
+
+  testWidgets('bird badge collection', (tester) async {
+    await setup(tester);
+    await _app(
+      tester,
+      (_) => const Scaffold(
+        body: SingleChildScrollView(
+          padding: EdgeInsets.all(12),
+          child: BirdBadgeCollection(level: 17),
+        ),
+      ),
+    );
+    expect(find.text('Phoenix'), findsOneWidget);
+    await _shot(tester, 'reward_badges');
   });
 
   testWidgets('session summary', (tester) async {

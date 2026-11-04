@@ -5,6 +5,7 @@ import 'package:flashcards/data/services/local/study_rewards.dart';
 import 'package:flashcards/domain/models/progress/level.dart';
 import 'package:flashcards/domain/models/progress/study_log.dart';
 import 'package:flashcards/ui/theme/theme_extensions.dart';
+import 'package:flashcards/ui/widgets/rewards/bird_badge.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -191,22 +192,30 @@ class LevelUpDialog extends StatelessWidget {
           Image.asset('assets/images/parrot_like.png', height: 150),
           const SizedBox(height: 8),
           Text(
-            'Level up!',
+            'New badge!',
             style: context.text.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 12),
-          LevelBadge(level: level.level, size: 64),
+          LevelBadge(level: level.level, size: 96),
           const SizedBox(height: 10),
           Text(
-            'You are now level ${level.level}: ${level.title}',
+            'You earned the ${level.title}',
             textAlign: TextAlign.center,
-            style: context.text.titleMedium,
+            style: context.text.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(
+            '${level.badge.rarity.label} badge',
+            style: context.text.labelLarge?.copyWith(
+              color: rarityColors(level.badge.rarity).$2,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
-            '${level.xpToNextLevel} XP to level ${level.level + 1}',
+            '${level.xpToNextLevel} XP to the ${level.nextTitle}',
             style: context.text.bodySmall,
           ),
         ],
@@ -222,7 +231,7 @@ class LevelUpDialog extends StatelessWidget {
   }
 }
 
-/// A round badge with the level number.
+/// The level's bird badge.
 class LevelBadge extends StatelessWidget {
   final int level;
   final double size;
@@ -230,29 +239,7 @@ class LevelBadge extends StatelessWidget {
   const LevelBadge({super.key, required this.level, this.size = 36});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [Color(0xFFFFB300), Color(0xFFFF6F00)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Text(
-        '$level',
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w800,
-          fontSize: size * 0.42,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => BirdBadgeIcon(level: level, size: size);
 }
 
 /// Level, title and a bar towards the next level.
@@ -265,7 +252,12 @@ class LevelProgressBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        LevelBadge(level: level.level),
+        // Tap to see every badge.
+        InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () => showBirdBadgeCollection(context, level.level),
+          child: LevelBadge(level: level.level, size: 44),
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -274,8 +266,18 @@ class LevelProgressBar extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      'Level ${level.level} · ${level.title}',
+                    child: Text.rich(
+                      TextSpan(
+                        text: level.title,
+                        children: [
+                          TextSpan(
+                            text: '  ${level.badge.rarity.label}',
+                            style: context.text.labelMedium?.copyWith(
+                              color: rarityColors(level.badge.rarity).$2,
+                            ),
+                          ),
+                        ],
+                      ),
                       style: context.text.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -298,7 +300,7 @@ class LevelProgressBar extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${level.xpToNextLevel} XP to level ${level.level + 1}',
+                '${level.xpToNextLevel} XP to the ${level.nextTitle}',
                 style: context.text.bodySmall?.copyWith(
                   color: context.colors.onSurfaceVariant,
                 ),

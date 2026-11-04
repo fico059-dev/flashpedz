@@ -55,9 +55,13 @@ void main() {
       expect(info.xpIntoLevel, 150);
       expect(info.xpToNextLevel, 150);
       expect(info.progress, 0.5);
-      expect(LevelInfo.fromXp(1000).title, 'Intern');
-      expect(levelTitle(1), 'Medical Student');
-      expect(levelTitle(45), 'Professor');
+      expect(LevelInfo.fromXp(0).title, 'Pigeon');
+      expect(LevelInfo.fromXp(1000).title, 'Kingfisher');
+      expect(LevelInfo.fromXp(1000).nextTitle, 'Woodpecker');
+      expect(LevelInfo.fromXp(13600).title, 'Phoenix');
+      expect(LevelInfo.fromXp(15300).title, 'Phoenix ★2');
+      expect(birdBadgeFor(1).rarity, BirdRarity.common);
+      expect(birdBadgeFor(17).rarity, BirdRarity.legendary);
     });
 
     test('XP comes from new cards, reviews, lapses and OSCEs', () {
