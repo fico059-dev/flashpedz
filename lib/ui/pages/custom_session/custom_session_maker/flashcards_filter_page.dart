@@ -169,7 +169,7 @@ class _LoadedContent extends StatelessWidget {
               TextSpan(
                 text:
                     " – Cards you've never studied, in regular study or "
-                    "a custom session.\n",
+                    "an exam.\n",
               ),
 
               TextSpan(text: "• "),

@@ -105,6 +105,6 @@ String defaultSessionName({
       ? tagNames.join(' + ')
       : packNames.isNotEmpty
       ? packNames.join(', ')
-      : 'Custom Session';
+      : 'Examine Yourself';
   return name.length <= 60 ? name : '${name.substring(0, 57)}...';
 }

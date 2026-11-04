@@ -102,7 +102,7 @@ class _AddToSetSheet extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Up to $maxCardSets sets. Study and browse them from '
-                  'Packs → Sets & Sessions.',
+                  'Packs → Examine Yourself.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 8),

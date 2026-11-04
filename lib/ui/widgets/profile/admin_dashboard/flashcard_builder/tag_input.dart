@@ -237,7 +237,7 @@ class _TopicFieldState extends State<_TopicField> {
               size: 22,
             ),
             labelText: 'Topic (optional), e.g. Cardiology',
-            helperText: 'Students can make a custom session of one topic.',
+            helperText: 'Students can examine themselves on one topic.',
             border: OutlineInputBorder(),
             counterText: '',
           ),

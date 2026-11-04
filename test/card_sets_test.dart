@@ -211,7 +211,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byTooltip('Session options'));
+    await tester.tap(find.byTooltip('Exam options'));
     await tester.pumpAndSettle();
     expect(find.text('Browse cards'), findsOneWidget);
     expect(find.text('Save as set'), findsOneWidget);
@@ -219,7 +219,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(browsed, isTrue);
 
-    await tester.tap(find.byTooltip('Session options'));
+    await tester.tap(find.byTooltip('Exam options'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();

@@ -78,7 +78,7 @@ class _MySetsSectionState extends State<MySetsSection> {
           for (final set in repo.sets) _SetTile(set: set),
         const SizedBox(height: 20),
         Text(
-          'Custom Sessions',
+          'Examine Yourself',
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),

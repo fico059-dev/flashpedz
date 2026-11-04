@@ -227,7 +227,7 @@ void main() {
     );
 
     expect(find.text('Neoreview + 2025'), findsOneWidget);
-    await tester.tap(find.byTooltip('Rename session'));
+    await tester.tap(find.byTooltip('Rename exam'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '  Neo 2025 exam ');
     await tester.tap(find.text('Save'));
@@ -235,6 +235,6 @@ void main() {
     expect(renamed, 'Neo 2025 exam');
 
     // Older sessions without a name keep the old title.
-    expect(session.copyWith(name: null).displayName, 'Custom Session');
+    expect(session.copyWith(name: null).displayName, 'Examine Yourself');
   });
 }

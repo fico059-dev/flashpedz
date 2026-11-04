@@ -104,7 +104,7 @@ class _DailyLimitsDialogState extends State<_DailyLimitsDialog> {
             const Text(
               'Choose how many new cards and reviews to study each day, like '
               'in Anki. You keep getting new cards every day even when many '
-              'reviews are due. Counts every pack, custom session and device.',
+              'reviews are due. Counts every pack, exam and device.',
             ),
             const SizedBox(height: 8),
             SwitchListTile(

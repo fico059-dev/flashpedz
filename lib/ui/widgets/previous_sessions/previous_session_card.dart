@@ -109,7 +109,7 @@ class PreviousSessionCard extends StatelessWidget {
                             ),
                             if (onRenamePressed != null)
                               IconButton(
-                                tooltip: 'Rename session',
+                                tooltip: 'Rename exam',
                                 visualDensity: VisualDensity.compact,
                                 iconSize: 18,
                                 onPressed: onRenamePressed,
@@ -190,7 +190,7 @@ class _SessionMenu extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete this session?'),
+        title: const Text('Delete this exam?'),
         content: const Text('Your card progress is kept.'),
         actions: [
           TextButton(
@@ -224,7 +224,7 @@ class _SessionMenu extends StatelessWidget {
       width: 32,
       height: 28,
       child: PopupMenuButton<_SessionAction>(
-        tooltip: 'Session options',
+        tooltip: 'Exam options',
         padding: EdgeInsets.zero,
         iconSize: 22,
         icon: const Icon(Icons.more_vert),

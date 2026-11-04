@@ -80,7 +80,7 @@ class CardsProgressView extends StatelessWidget {
                   onPressed: () =>
                       context.router.push(CustomSessionWrapperRoute()),
                   icon: const Icon(Icons.tune),
-                  label: const Text('Make a custom session'),
+                  label: const Text('Examine yourself'),
                 ),
             ],
           ),

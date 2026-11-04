@@ -74,8 +74,8 @@ class _FlashcardLimitPageState extends State<FlashcardLimitPage> {
       isLoading: (state) =>
           state is SessionLimitLoaded && state.status.isLoading,
       loadingText:
-          "Creating session. This might take a while depending on "
-          "the size of the session",
+          "Creating your exam. This might take a while depending on "
+          "how many cards it has",
       child: BlocListener<SessionLimitCubit, SessionLimitState>(
         listenWhen: (previous, current) =>
             current is SessionLimitLoaded && current.status.isSuccess ||
@@ -90,7 +90,7 @@ class _FlashcardLimitPageState extends State<FlashcardLimitPage> {
               return;
             case SessionLimitStatus.success:
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Successfully created new session")),
+                SnackBar(content: Text("Exam created")),
               );
               context.router.parent()?.pop();
               return;
@@ -185,9 +185,9 @@ class _LoadedContent extends StatelessWidget {
 
     final countText = isEstimatePrecise
         ? "$flashcardsCount flashcards are available. How many "
-              "would you like to include in your session?"
+              "would you like in your exam?"
         : "Up to $flashcardsCount flashcards are available. How many "
-              "would you like to include in your session?";
+              "would you like in your exam?";
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,7 +209,7 @@ class _LoadedContent extends StatelessWidget {
           maxLength: 60,
           textCapitalization: TextCapitalization.sentences,
           decoration: InputDecoration(
-            labelText: "Session name (optional)",
+            labelText: "Exam name (optional)",
             hintText: defaultName,
             helperText: "Leave empty to use \"$defaultName\"",
             helperMaxLines: 2,
@@ -285,7 +285,7 @@ class _LoadedContent extends StatelessWidget {
         Center(
           child: BlocButton<SessionLimitCubit, SessionLimitState>(
             showSpinner: false,
-            textString: "Create custom session",
+            textString: "Create exam",
             onPressed: (context) => onSubmit(),
             isLoadingState: (state) =>
                 state is SessionLimitLoaded && state.status.isLoading,

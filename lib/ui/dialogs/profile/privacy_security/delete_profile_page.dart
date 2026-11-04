@@ -121,7 +121,7 @@ class _DeleteProfileViewState extends State<_DeleteProfileView> {
                           isThreeLine: true,
                           subtitle: Text(
                             "Deleting your account will remove all your data "
-                            "(profile, progress, and custom sessions). \n\nHowever, "
+                            "(profile, progress, sets and exams). \n\nHowever, "
                             "any active subscription linked to your email will remain. "
                             "If you create a new account using the same email address "
                             "your subscriptions "

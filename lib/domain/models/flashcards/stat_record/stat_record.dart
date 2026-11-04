@@ -30,7 +30,7 @@ abstract class StatRecord with _$StatRecord {
       packId: '-1',
       question:
           "Ooops, looks like someone deleted this flashcard but it's still"
-          " in this custom session, you can skip it or you can create new custom session.",
+          " in this exam, you can skip it or create a new exam.",
       answer: '',
       tags: [],
     ),

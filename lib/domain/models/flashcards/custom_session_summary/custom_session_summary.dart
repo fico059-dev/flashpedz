@@ -18,5 +18,5 @@ abstract class CustomSessionSummary with _$CustomSessionSummary {
 extension CustomSessionSummaryX on CustomSessionSummary {
   bool get isFinished => currentIndex >= cardCount;
 
-  String get displayName => name ?? 'Custom Session';
+  String get displayName => name ?? 'Examine Yourself';
 }

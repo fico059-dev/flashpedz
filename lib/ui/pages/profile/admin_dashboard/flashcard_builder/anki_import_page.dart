@@ -417,7 +417,7 @@ class _Preview extends StatelessWidget {
                   labelText: "Topic for these cards (optional)",
                   hintText: "e.g. Cardiology",
                   helperText:
-                      "Students can make a custom session of one topic.",
+                      "Students can examine themselves on one topic.",
                   border: OutlineInputBorder(),
                   counterText: '',
                 ),

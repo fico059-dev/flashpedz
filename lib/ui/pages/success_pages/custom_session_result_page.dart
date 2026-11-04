@@ -31,13 +31,13 @@ class CustomSessionResultPage extends StatelessWidget {
   String _getMessage() {
     switch (scoreStatus) {
       case ScoreStatus.low:
-        return "Good effort! You’ve finished your custom session.\n"
+        return "Good effort! You’ve finished your exam.\n"
             "Don’t worry if the score isn’t high this time — every try helps you learn and improve.";
       case ScoreStatus.okay:
         return "Nice work! You stayed focused and made progress.\n"
             "Keep practicing and you’ll get even better next time.";
       case ScoreStatus.max:
-        return "Congratulations! You answered everything correctly in this custom session.\n"
+        return "Congratulations! You answered everything correctly in this exam.\n"
             "Awesome focus and great job!";
     }
   }

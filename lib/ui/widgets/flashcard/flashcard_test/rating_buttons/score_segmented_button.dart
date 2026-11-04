@@ -28,6 +28,7 @@ class ScoreSegmentedButton<T> extends StatelessWidget {
           label: segment.label,
           time: segment.time,
           tooltip: segment.tooltip,
+          color: segment.color,
         );
       }).toList(),
     );
@@ -40,11 +41,15 @@ class ScoreSegment<T> {
   final String? time;
   final String tooltip;
 
+  /// The button's colour; the theme's when null.
+  final Color? color;
+
   const ScoreSegment({
     required this.value,
     required this.label,
     required this.tooltip,
     this.time,
+    this.color,
   });
 }
 
@@ -55,6 +60,7 @@ class ScoreButton extends StatelessWidget {
   final bool disabled;
   final String? time;
   final String tooltip;
+  final Color? color;
 
   const ScoreButton({
     super.key,
@@ -64,6 +70,7 @@ class ScoreButton extends StatelessWidget {
     required this.tooltip,
     this.disabled = false,
     this.time,
+    this.color,
   });
 
   @override
@@ -78,8 +85,9 @@ class ScoreButton extends StatelessWidget {
         children: [
           Material(
             color: isActive
-                ? context.colors.primary
-                : context.colors.surfaceContainerHighest,
+                ? (color ?? context.colors.primary)
+                : color?.withValues(alpha: 0.12) ??
+                      context.colors.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(80),
             child: InkWell(
               borderRadius: BorderRadius.circular(80),
@@ -89,9 +97,10 @@ class ScoreButton extends StatelessWidget {
                 width: 65,
                 decoration: BoxDecoration(
                   border: Border.all(
+                    width: color == null ? 1 : 2,
                     color: isActive
-                        ? context.colors.primaryContainer
-                        : context.colors.onSurfaceVariant,
+                        ? (color ?? context.colors.primaryContainer)
+                        : color ?? context.colors.onSurfaceVariant,
                   ),
                   borderRadius: BorderRadius.circular(80),
                 ),
@@ -101,8 +110,10 @@ class ScoreButton extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextTheme.of(context).titleMedium?.copyWith(
                       color: isActive
-                          ? context.colors.surface
-                          : context.colors.primary,
+                          ? (color == null
+                                ? context.colors.surface
+                                : Colors.white)
+                          : color ?? context.colors.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

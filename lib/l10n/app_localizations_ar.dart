@@ -442,7 +442,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get flashcardPage_packTitle => 'Pack';
+  String get flashcardPage_packTitle => 'Learning Section';
 
   @override
   String get flashcardPage_packSubtext => 'pack';

@@ -144,7 +144,7 @@ class _ViewState extends State<_View> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Custom session test"),
+        title: Text("Examine Yourself"),
         leading: IconButton(
           onPressed: () => context.router.pop(),
           icon: Icon(Icons.arrow_back),
@@ -321,7 +321,7 @@ Future<void> _showSessionFinishedDialog({
       return AlertDialog(
         title: const Text('Session Complete 🎉'),
         content: Text(
-          'Congratulations! You have successfully finished this custom session.'
+          'Congratulations! You have successfully finished this exam.'
           '\n\nWell done for staying focused and making progress.'
           ' Keep up the great work!'
           '\n\nYour score is $correctCount/$allCount',
