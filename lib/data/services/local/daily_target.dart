@@ -73,6 +73,17 @@ class DailyStatus {
   final bool fromGoal;
   final DailyMood mood;
 
+  /// The student's daily plan: new cards and reviews a day. When set, the
+  /// target is their sum.
+  final ({int newCards, int reviews})? plan;
+
+  /// New cards and reviews studied today, on all devices.
+  final int newDone;
+  final int reviewDone;
+
+  /// What the exam goal needs a day, to suggest for the plan.
+  final int? goalPerDay;
+
   const DailyStatus({
     required this.target,
     required this.done,
@@ -80,6 +91,10 @@ class DailyStatus {
     required this.mood,
     this.yesterdayTarget,
     this.yesterdayDone,
+    this.plan,
+    this.newDone = 0,
+    this.reviewDone = 0,
+    this.goalPerDay,
   });
 
   double get progress => target <= 0 ? 0 : min(1.0, done / target);
@@ -128,15 +143,17 @@ class DailyTargetService {
     }
   }
 
-  /// Today's target: what the exam goal needs per day, else the cards per
-  /// session. Remembered per day, to know later whether it was reached.
+  /// Today's target: the student's daily plan (new cards + reviews), else
+  /// what the exam goal needs per day, else the cards per session.
+  /// Remembered per day, to know later whether it was reached.
   Future<({int target, bool fromGoal})> todayTarget(int cardsPerSession) async {
     final now = _now();
     final today = dayKey(now);
     final log = await _logStore.loadCombined();
+    final plan = log.dailyLimits;
     final signature = goalSignature(log.goal);
-    var fromGoal = log.dayTarget(now, signature);
-    if (fromGoal == null) {
+    var fromGoal = plan != null ? null : log.dayTarget(now, signature);
+    if (plan == null && fromGoal == null) {
       fromGoal = goalCardsPerDay(log, now);
       final fixed = fromGoal;
       if (fixed != null) {
@@ -145,7 +162,9 @@ class DailyTargetService {
         );
       }
     }
-    final target = fromGoal ?? cardsPerSession;
+    final target = plan != null
+        ? plan.newCards + plan.reviews
+        : fromGoal ?? cardsPerSession;
     final targets = await _readTargets();
     final key = _key;
     if (key != null && targets[today] != target) {
@@ -188,12 +207,17 @@ class DailyTargetService {
     );
     final yesterdayTarget =
         targets[dayKey(yesterday)] ?? (studiedBefore ? today.target : null);
-    final done = log.activityOn(now).reviews;
+    final activity = log.activityOn(now);
+    final done = activity.reviews;
     final yesterdayDone = log.activityOn(yesterday).reviews;
     return DailyStatus(
       target: today.target,
       done: done,
       fromGoal: today.fromGoal,
+      plan: log.dailyLimits,
+      newDone: activity.newCards,
+      reviewDone: max(0, activity.reviews - activity.newCards),
+      goalPerDay: goalCardsPerDay(log, now),
       yesterdayTarget: yesterdayTarget,
       yesterdayDone: yesterdayDone,
       mood: dailyMood(

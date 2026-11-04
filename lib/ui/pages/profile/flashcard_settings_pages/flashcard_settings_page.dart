@@ -35,9 +35,9 @@ class FlashcardSettingsPage extends StatelessWidget {
                 ),
               ),
               ProfileMenuWidget(
-                title: "Daily New Cards & Reviews",
+                title: "Daily Plan (cards a day, new cards)",
                 icon: Icons.tune,
-                onPress: () => showDailyLimitsDialog(context),
+                onPress: () => showDailyPlanDialog(context),
               ),
               ProfileMenuWidget(
                 title: "Manage Ignored Flashcards",

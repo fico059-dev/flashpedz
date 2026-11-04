@@ -14,6 +14,8 @@ import 'package:flashcards/ui/dialogs/flashcard/share_card_dialog.dart';
 import 'package:flashcards/ui/dialogs/card_sets/card_set_dialogs.dart';
 import 'package:flashcards/ui/dialogs/flashcard/session_target_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:flashcards/data/services/local/session_progress_store.dart';
+import 'package:flashcards/ui/dialogs/flashcard/daily_limits_dialog.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class TopRowWithFlashcardBloc extends StatelessWidget {
@@ -154,6 +156,15 @@ class _TargetButton extends StatelessWidget {
   Future<void> _change(BuildContext context) async {
     final bloc = context.read<FlashcardBloc>();
     final state = bloc.state;
+    // With a daily plan, sessions follow it: change the plan.
+    if (await context.read<SessionProgressStore>().dailyLimits() != null) {
+      if (!context.mounted) return;
+      if (await showDailyPlanDialog(context)) {
+        bloc.add(FlashcardSessionTargetChanged(null));
+      }
+      return;
+    }
+    if (!context.mounted) return;
     final choice = await showSessionTargetDialog(
       context: context,
       packName: state.pack?.name ?? 'this pack',
@@ -173,7 +184,7 @@ class _TargetButton extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!enabled) return child;
     return Tooltip(
-      message: 'Change cards per session for this pack',
+      message: 'Change how many cards to study',
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: () => _change(context),

@@ -1,31 +1,42 @@
+import 'dart:math';
+
 import 'package:flashcards/data/services/local/session_progress_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-/// Lets the student choose how many new cards and reviews to study a day,
-/// so new cards keep coming even when many reviews are due.
-Future<void> showDailyLimitsDialog(BuildContext context) async {
+/// Lets the student choose their daily plan: how many cards to study a day
+/// and how many of them are new (the rest are reviews). It sets today's
+/// target on the home page and the size of every pack's session.
+/// [goalPerDay] is what the exam goal needs, offered as a suggestion.
+/// Returns whether the plan changed.
+Future<bool> showDailyPlanDialog(
+  BuildContext context, {
+  int? goalPerDay,
+}) async {
   final store = context.read<SessionProgressStore>();
   final messenger = ScaffoldMessenger.of(context);
   final current = await store.dailyLimits();
-  if (!context.mounted) return;
+  if (!context.mounted) return false;
   final chosen = await showDialog<_Choice>(
     context: context,
-    builder: (context) => _DailyLimitsDialog(current: current),
+    builder: (context) =>
+        DailyPlanDialog(current: current, goalPerDay: goalPerDay),
   );
-  if (chosen == null) return;
+  if (chosen == null) return false;
   await store.setDailyLimits(chosen.limits);
+  final plan = chosen.limits;
   messenger.showSnackBar(
     SnackBar(
       content: Text(
-        chosen.limits == null
-            ? 'Daily limits off: sessions use their usual size.'
-            : 'Every day: up to ${chosen.limits!.newCards} new cards and '
-                  '${chosen.limits!.reviews} reviews.',
+        plan == null
+            ? 'Daily plan off: sessions use your cards per session.'
+            : 'Every day: ${plan.newCards + plan.reviews} cards, '
+                  '${plan.newCards} new and ${plan.reviews} reviews.',
       ),
     ),
   );
+  return true;
 }
 
 class _Choice {
@@ -34,30 +45,43 @@ class _Choice {
   const _Choice(this.limits);
 }
 
-class _DailyLimitsDialog extends StatefulWidget {
+class DailyPlanDialog extends StatefulWidget {
   final ({int newCards, int reviews})? current;
+  final int? goalPerDay;
 
-  const _DailyLimitsDialog({required this.current});
+  const DailyPlanDialog({super.key, required this.current, this.goalPerDay});
 
   @override
-  State<_DailyLimitsDialog> createState() => _DailyLimitsDialogState();
+  State<DailyPlanDialog> createState() => _DailyPlanDialogState();
 }
 
-class _DailyLimitsDialogState extends State<_DailyLimitsDialog> {
+class _DailyPlanDialogState extends State<DailyPlanDialog> {
+  static const _maxTotal = 2000;
+
   late bool _on = widget.current != null;
-  late final _newCards = TextEditingController(
-    text: '${widget.current?.newCards ?? 20}',
+  late final _total = TextEditingController(
+    text:
+        '${widget.current == null ? 100 : widget.current!.newCards + widget.current!.reviews}',
   );
-  late final _reviews = TextEditingController(
-    text: '${widget.current?.reviews ?? 200}',
-  );
+  late int _newCards = widget.current?.newCards ?? 20;
   String? _error;
+
+  int get _totalValue => int.tryParse(_total.text.trim()) ?? 0;
 
   @override
   void dispose() {
-    _newCards.dispose();
-    _reviews.dispose();
+    _total.dispose();
     super.dispose();
+  }
+
+  void _useGoal() {
+    final goal = widget.goalPerDay!;
+    setState(() {
+      _newCards = goal;
+      if (_totalValue < goal) _total.text = '${goal * 2}';
+      _on = true;
+      _error = null;
+    });
   }
 
   void _save() {
@@ -65,74 +89,113 @@ class _DailyLimitsDialogState extends State<_DailyLimitsDialog> {
       Navigator.of(context).pop(const _Choice(null));
       return;
     }
-    final newCards = int.tryParse(_newCards.text.trim());
-    final reviews = int.tryParse(_reviews.text.trim());
-    if (newCards == null ||
-        reviews == null ||
-        newCards > 1000 ||
-        reviews > 5000 ||
-        newCards + reviews == 0) {
-      setState(() => _error = 'Enter 0–1000 new cards and 0–5000 reviews.');
+    final total = _totalValue;
+    if (total <= 0 || total > _maxTotal) {
+      setState(() => _error = 'Enter 1 to $_maxTotal cards a day.');
       return;
     }
-    Navigator.of(context).pop(_Choice((newCards: newCards, reviews: reviews)));
+    final newCards = min(_newCards, total);
+    Navigator.of(
+      context,
+    ).pop(_Choice((newCards: newCards, reviews: total - newCards)));
   }
-
-  Widget _field(TextEditingController controller, String label, String help) =>
-      TextField(
-        controller: controller,
-        enabled: _on,
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: InputDecoration(
-          labelText: label,
-          helperText: help,
-          border: const OutlineInputBorder(),
-        ),
-        onSubmitted: (_) => _save(),
-      );
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final total = _totalValue.clamp(0, _maxTotal);
+    final newCards = min(_newCards, total);
+    final goal = widget.goalPerDay;
     return AlertDialog(
-      title: const Text('Daily new cards & reviews'),
+      title: const Text('Daily plan'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Choose how many new cards and reviews to study each day, like '
-              'in Anki. You keep getting new cards every day even when many '
-              'reviews are due. Counts every pack, exam and device.',
+              'How many cards to study each day, and how many of them are '
+              'new. It sets today\'s target and every pack\'s session, on all '
+              'your devices.',
             ),
-            const SizedBox(height: 8),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Use daily limits'),
+              title: const Text('Use a daily plan'),
               value: _on,
               onChanged: (value) => setState(() {
                 _on = value;
                 _error = null;
               }),
             ),
-            const SizedBox(height: 8),
-            _field(_newCards, 'New cards per day', 'Cards you have never seen'),
+            TextField(
+              controller: _total,
+              enabled: _on,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                labelText: 'Cards a day',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (_) => setState(() => _error = null),
+              onSubmitted: (_) => _save(),
+            ),
             const SizedBox(height: 16),
-            _field(_reviews, 'Reviews per day', 'Cards due again'),
+            Text(
+              'New cards: $newCards',
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: _on ? null : theme.disabledColor,
+              ),
+            ),
+            Slider(
+              value: newCards.toDouble(),
+              max: max(1, total).toDouble(),
+              divisions: max(1, total),
+              label: '$newCards new',
+              onChanged: _on && total > 0
+                  ? (value) => setState(() => _newCards = value.round())
+                  : null,
+            ),
+            Text(
+              '$newCards new + ${total - newCards} reviews = $total cards',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (goal != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withValues(
+                    alpha: 0.5,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.flag_outlined),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Your exam goal needs about $goal new cards a day.',
+                      ),
+                    ),
+                    TextButton(onPressed: _useGoal, child: const Text('Use')),
+                  ],
+                ),
+              ),
+            ],
             if (_error != null) ...[
               const SizedBox(height: 10),
-              Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
+              Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
             ],
             if (!_on) ...[
               const SizedBox(height: 10),
               Text(
                 'Off: each session uses your cards per session (or your exam '
                 'goal), mostly reviews when many are due.',
-                style: Theme.of(context).textTheme.bodySmall,
+                style: theme.textTheme.bodySmall,
               ),
             ],
           ],

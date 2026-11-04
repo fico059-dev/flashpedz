@@ -537,11 +537,11 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
         // What the user's other devices studied today, so every device
         // continues the same session.
         await _sessionProgress.refresh();
-        // A target chosen for this pack comes first, then the student's
-        // daily new card and review limits.
-        final own = await _sessionProgress.packTarget(_uid, pack.id);
-        final limits = own == null
-            ? await _sessionProgress.dailyLimits()
+        // The student's daily plan (new cards and reviews a day) comes
+        // first, then a target chosen for this pack.
+        final limits = await _sessionProgress.dailyLimits();
+        final own = limits == null
+            ? await _sessionProgress.packTarget(_uid, pack.id)
             : null;
         int? maxNew, maxDue;
         if (own != null) {

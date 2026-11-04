@@ -85,13 +85,28 @@ class _Progress implements ProgressRepository {
 }
 
 class _Daily implements DailyTargetService {
+  final bool withPlan;
+
+  _Daily({this.withPlan = false});
+
   @override
-  Future<DailyStatus> status(int cardsPerSession) async => const DailyStatus(
-    target: 70,
-    done: 42,
-    fromGoal: true,
-    mood: DailyMood.excited,
-  );
+  Future<DailyStatus> status(int cardsPerSession) async => withPlan
+      ? const DailyStatus(
+          target: 120,
+          done: 50,
+          fromGoal: false,
+          mood: DailyMood.calm,
+          plan: (newCards: 30, reviews: 90),
+          newDone: 12,
+          reviewDone: 38,
+          goalPerDay: 70,
+        )
+      : const DailyStatus(
+          target: 70,
+          done: 42,
+          fromGoal: true,
+          mood: DailyMood.excited,
+        );
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -115,62 +130,78 @@ Future<void> _loadFont(String family, List<String> files) async {
 }
 
 void main() {
-  testWidgets('home page', (tester) async {
-    await tester.runAsync(() async {
-      await _loadFont('Roboto', [
-        'Roboto-Regular.ttf',
-        'Roboto-Medium.ttf',
-        'Roboto-Bold.ttf',
-      ]);
-      await _loadFont('MaterialIcons', ['MaterialIcons-Regular.otf']);
-    });
-    tester.view.physicalSize = const Size(390 * 2, 1250 * 2);
-    tester.view.devicePixelRatio = 2;
-    addTearDown(tester.view.reset);
+  for (final withPlan in [false, true]) {
+    testWidgets(withPlan ? 'home page with a daily plan' : 'home page', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        await _loadFont('Roboto', [
+          'Roboto-Regular.ttf',
+          'Roboto-Medium.ttf',
+          'Roboto-Bold.ttf',
+        ]);
+        await _loadFont('MaterialIcons', ['MaterialIcons-Regular.otf']);
+      });
+      tester.view.physicalSize = const Size(390 * 2, 1250 * 2);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
 
-    final profile = ProfileReaderCubit(profileRepo: _ProfileRepo())
-      ..emit(
-        ProfileReaderState.isLoaded(
-          profile: Profile(
-            name: 'Faisal',
-            surname: 'A',
-            username: 'f',
-            email: 'f@x.com',
-            phoneNumber: '',
-            educationLevel: EducationLevel.values.first,
-            streak: Streak(count: 3, lastStreakDate: _now),
-            profileSettings: const ProfileSettings(cardsPerSession: 100),
+      final profile = ProfileReaderCubit(profileRepo: _ProfileRepo())
+        ..emit(
+          ProfileReaderState.isLoaded(
+            profile: Profile(
+              name: 'Faisal',
+              surname: 'A',
+              username: 'f',
+              email: 'f@x.com',
+              phoneNumber: '',
+              educationLevel: EducationLevel.values.first,
+              streak: Streak(count: 3, lastStreakDate: _now),
+              profileSettings: const ProfileSettings(cardsPerSession: 100),
+            ),
+          ),
+        );
+      final key = GlobalKey();
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            Provider<ProgressRepository>.value(value: _Progress()),
+            Provider<DailyTargetService>.value(
+              value: _Daily(withPlan: withPlan),
+            ),
+            BlocProvider.value(value: profile),
+          ],
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: lightThemeData,
+            home: RepaintBoundary(key: key, child: const HomePage()),
           ),
         ),
       );
-    final key = GlobalKey();
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          Provider<ProgressRepository>.value(value: _Progress()),
-          Provider<DailyTargetService>.value(value: _Daily()),
-          BlocProvider.value(value: profile),
-        ],
-        child: MaterialApp(
-          debugShowCheckedModeBanner: false,
-          theme: lightThemeData,
-          home: RepaintBoundary(key: key, child: const HomePage()),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text("Today's plan"), findsOneWidget);
-    expect(find.text('Your knowledge garden'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.text("Today's plan"), findsOneWidget);
+      expect(find.text('Your knowledge garden'), findsOneWidget);
+      if (withPlan) {
+        expect(find.text('Study 120 cards today'), findsOneWidget);
+        expect(find.text('12/30'), findsOneWidget);
+        expect(find.text('38/90'), findsOneWidget);
+      } else {
+        expect(
+          find.text('Choose cards a day and how many are new'),
+          findsOneWidget,
+        );
+      }
 
-    await tester.runAsync(() async {
-      final boundary =
-          key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-      final image = await boundary.toImage(pixelRatio: 2);
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      final dir = Directory('build/screens')..createSync(recursive: true);
-      File(
-        '${dir.path}/home_page.png',
-      ).writeAsBytesSync(data!.buffer.asUint8List());
+      await tester.runAsync(() async {
+        final boundary =
+            key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+        final image = await boundary.toImage(pixelRatio: 2);
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        final dir = Directory('build/screens')..createSync(recursive: true);
+        File(
+          '${dir.path}/${withPlan ? 'home_page_plan' : 'home_page'}.png',
+        ).writeAsBytesSync(data!.buffer.asUint8List());
+      });
     });
-  });
+  }
 }

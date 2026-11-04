@@ -83,6 +83,42 @@ void main() {
     expect((await service.status(100)).mood, DailyMood.sad);
   });
 
+  test('a daily plan sets the target, new cards and reviews', () async {
+    final prefs = _MemoryPrefs();
+    final store = StudyLogStore(authService: FakeAuth(), prefs: prefs);
+    await store.update((_) => goalLog());
+    final service = DailyTargetService(
+      logStore: store,
+      auth: FakeAuth(),
+      prefs: prefs,
+      now: () => now,
+    );
+    await store.update(
+      (log) => log.setDailyLimits((newCards: 30, reviews: 90), now),
+    );
+    // The plan comes before the exam goal.
+    expect(await service.todayTarget(100), (target: 120, fromGoal: false));
+
+    await store.update((log) {
+      var updated = log;
+      for (var i = 0; i < 10; i++) {
+        updated = updated.recordReview(now: now, isNew: i < 4, forgot: false);
+      }
+      return updated;
+    });
+    final status = await service.status(100);
+    expect(status.plan, (newCards: 30, reviews: 90));
+    expect(status.done, 10);
+    expect(status.newDone, 4);
+    expect(status.reviewDone, 6);
+    // The goal is still offered as a suggestion.
+    expect(status.goalPerDay, 70);
+
+    // Plan off: back to the goal.
+    await store.update((log) => log.setDailyLimits(null, now));
+    expect((await service.status(100)).plan, isNull);
+  });
+
   test('the parrot follows today and yesterday', () {
     DailyMood mood(int done, {int hour = 10, int? yDone, int? yTarget}) =>
         dailyMood(

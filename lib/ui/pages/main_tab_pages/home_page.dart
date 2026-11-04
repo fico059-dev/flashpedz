@@ -10,6 +10,7 @@ import 'package:flashcards/ui/pages/main_tab_pages/main_tab_routes.dart';
 import 'package:flashcards/ui/theme/theme_extensions.dart';
 import 'package:flashcards/ui/widgets/home/card_garden.dart';
 import 'package:flashcards/utils/result.dart';
+import 'package:flashcards/ui/dialogs/flashcard/daily_limits_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -123,6 +124,17 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// Opens the daily plan, suggesting what the exam goal needs.
+  Future<void> _editPlan() async {
+    final data = await _data;
+    if (!mounted) return;
+    final changed = await showDailyPlanDialog(
+      context,
+      goalPerDay: data?.today?.goalPerDay,
+    );
+    if (changed && mounted) setState(() => _data = _load());
+  }
+
   void _goToTab(MainTab tab) => AutoTabsRouter.of(
     context,
   ).setActiveIndex(MainTabRoutes.mainTabToIndex(tab));
@@ -185,6 +197,7 @@ class _HomePageState extends State<HomePage> {
                             data: data,
                             onStudy: () => _goToTab(MainTab.packs),
                             onOsce: () => _goToTab(MainTab.osce),
+                            onEditPlan: _editPlan,
                           ),
                           const SizedBox(height: 16),
                           if (data.stats != null)
@@ -202,6 +215,7 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 16),
                   _QuickLinks(
                     onProgress: () => _goToTab(MainTab.learningProgress),
+                    onDailyPlan: _editPlan,
                   ),
                 ],
               ),
@@ -217,11 +231,13 @@ class _TodayPlan extends StatelessWidget {
   final _HomeData data;
   final VoidCallback onStudy;
   final VoidCallback onOsce;
+  final VoidCallback onEditPlan;
 
   const _TodayPlan({
     required this.data,
     required this.onStudy,
     required this.onOsce,
+    required this.onEditPlan,
   });
 
   @override
@@ -256,6 +272,12 @@ class _TodayPlan extends StatelessWidget {
                   DateFormat('EEE d MMM').format(DateTime.now()),
                   style: context.text.labelMedium,
                 ),
+                IconButton(
+                  tooltip: 'Daily plan',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onEditPlan,
+                  icon: const Icon(Icons.tune, size: 20),
+                ),
               ],
             ),
             if (daysLeft != null && daysLeft > 0)
@@ -271,30 +293,63 @@ class _TodayPlan extends StatelessWidget {
                 ),
               ),
             const SizedBox(height: 8),
-            _PlanItem(
-              icon: Icons.replay,
-              title: due == null
-                  ? 'Review due cards'
-                  : due == 0
-                  ? 'No reviews due, all caught up'
-                  : 'Review $due due ${due == 1 ? 'card' : 'cards'}',
-              done: due == 0,
-              onTap: onStudy,
-            ),
-            _PlanItem(
-              icon: Icons.style_outlined,
-              title: today == null
-                  ? 'Study your cards'
-                  : 'Study ${today.target} cards'
-                        '${today.fromGoal ? ' today' : ''}',
-              subtitle: today == null
-                  ? null
-                  : '${today.done.clamp(0, today.target)} of ${today.target} '
-                        'done today',
-              progress: today?.progress,
-              done: today != null && today.done >= today.target,
-              onTap: onStudy,
-            ),
+            if (today?.plan case final plan?)
+              _PlanItem(
+                icon: Icons.style_outlined,
+                title: 'Study ${today!.target} cards today',
+                subtitle:
+                    '${plan.newCards} new · ${plan.reviews} reviews'
+                    '${due == null || due == 0 ? '' : ' ($due due now)'}',
+                progress: today.progress,
+                done: today.done >= today.target,
+                onTap: onStudy,
+                details: [
+                  _PlanPart(
+                    label: 'New',
+                    done: today.newDone,
+                    target: plan.newCards,
+                  ),
+                  _PlanPart(
+                    label: 'Reviews',
+                    done: today.reviewDone,
+                    target: plan.reviews,
+                  ),
+                ],
+              )
+            else ...[
+              _PlanItem(
+                icon: Icons.replay,
+                title: due == null
+                    ? 'Review due cards'
+                    : due == 0
+                    ? 'No reviews due, all caught up'
+                    : 'Review $due due ${due == 1 ? 'card' : 'cards'}',
+                done: due == 0,
+                onTap: onStudy,
+              ),
+              _PlanItem(
+                icon: Icons.style_outlined,
+                title: today == null
+                    ? 'Study your cards'
+                    : 'Study ${today.target} cards'
+                          '${today.fromGoal ? ' today' : ''}',
+                subtitle: today == null
+                    ? null
+                    : '${today.done.clamp(0, today.target)} of ${today.target} '
+                          'done today',
+                progress: today?.progress,
+                done: today != null && today.done >= today.target,
+                onTap: onStudy,
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onEditPlan,
+                  icon: const Icon(Icons.tune, size: 18),
+                  label: const Text('Choose cards a day and how many are new'),
+                ),
+              ),
+            ],
             _PlanItem(
               icon: Icons.medical_services_outlined,
               title: 'Practice one OSCE station',
@@ -308,6 +363,19 @@ class _TodayPlan extends StatelessWidget {
   }
 }
 
+/// New cards or reviews in the daily plan: done of target.
+class _PlanPart {
+  final String label;
+  final int done;
+  final int target;
+
+  const _PlanPart({
+    required this.label,
+    required this.done,
+    required this.target,
+  });
+}
+
 class _PlanItem extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -315,6 +383,7 @@ class _PlanItem extends StatelessWidget {
   final double? progress;
   final bool done;
   final VoidCallback onTap;
+  final List<_PlanPart> details;
 
   const _PlanItem({
     required this.icon,
@@ -323,6 +392,7 @@ class _PlanItem extends StatelessWidget {
     this.subtitle,
     this.progress,
     this.done = false,
+    this.details = const [],
   });
 
   @override
@@ -364,6 +434,38 @@ class _PlanItem extends StatelessWidget {
                       ),
                     ),
                   ],
+                  for (final part in details)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 64,
+                            child: Text(
+                              part.label,
+                              style: context.text.labelMedium,
+                            ),
+                          ),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: LinearProgressIndicator(
+                                value: part.target <= 0
+                                    ? 1
+                                    : (part.done / part.target).clamp(0.0, 1.0),
+                                minHeight: 4,
+                                color: part.done >= part.target ? green : null,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${part.done.clamp(0, part.target)}/${part.target}',
+                            style: context.text.labelMedium,
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -576,8 +678,9 @@ class _Legend extends StatelessWidget {
 
 class _QuickLinks extends StatelessWidget {
   final VoidCallback onProgress;
+  final VoidCallback onDailyPlan;
 
-  const _QuickLinks({required this.onProgress});
+  const _QuickLinks({required this.onProgress, required this.onDailyPlan});
 
   @override
   Widget build(BuildContext context) {
@@ -600,11 +703,8 @@ class _QuickLinks extends StatelessWidget {
           'OSCE results',
           () => context.router.push(const OscePerformancesRoute()),
         ),
-        link(
-          Icons.tune,
-          'Cards per session',
-          () => context.router.push(const UpdateCardsPerSessionRoute()),
-        ),
+        // The daily plan replaces cards per session.
+        link(Icons.tune, 'Daily plan', onDailyPlan),
         link(Icons.insights, 'Progress', onProgress),
       ],
     );

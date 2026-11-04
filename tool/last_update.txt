@@ -1,1 +1,1 @@
-FlashPedz update: 4 Nov 2026 - Undo, My Sets, topics, leave out tags, browse session cards, highlight PDF export, Underline, menus instead of swiping, bookmark freeze fixed, phone editor.
+FlashPedz update: 5 Nov 2026 - Daily plan (cards a day + new cards) on home, bird badges, Examine Yourself, Learning Section, red Again, picture below button, OSCE gym on OSCE tab, exams from forgotten/hard/due cards.
