@@ -3,41 +3,58 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'session_tag_picker_state.freezed.dart';
 
+/// In [SessionTagPickerLoaded.selectedTags] a tag set to true is required
+/// (topics: one of the chosen topics is required) and a tag set to false is
+/// excluded.
 extension SessionTagPickerStateX on SessionTagPickerState {
-  List<String> get selectedTagsList {
+  Iterable<String> _ids(bool value, {required bool topics}) {
     final state = this;
-    if (state is! SessionTagPickerLoaded) return [];
-
-    return state.selectedTags.entries.map((e) => e.key).toList();
+    if (state is! SessionTagPickerLoaded) return const [];
+    return state.selectedTags.entries
+        .where((e) => e.value == value && Tag.fromId(e.key).isTopic == topics)
+        .map((e) => e.key);
   }
 
-  List<Tag> get selectedTagsObject {
-    final state = this;
-    if (state is! SessionTagPickerLoaded) return [];
+  /// Tags every card must have.
+  List<String> get selectedTagsList => _ids(true, topics: false).toList();
 
-    return state.selectedTags.keys.map((k) => Tag.fromId(k)).toList();
-  }
+  List<Tag> get selectedTagsObject =>
+      selectedTagsList.map((k) => Tag.fromId(k)).toList();
 
-  /// With no tags selected every card counts, so the card count is exact.
-  /// Otherwise a card must have all the selected tags, which can only be
-  /// estimated here.
+  /// Topics, a card must have one of them.
+  List<String> get selectedTopics => _ids(true, topics: true).toList();
+
+  /// Tags (or topics) whose cards are left out.
+  List<String> get excludedTags => [
+    ..._ids(false, topics: false),
+    ..._ids(false, topics: true),
+  ];
+
+  /// With nothing chosen every card counts, so the card count is exact.
+  /// Otherwise it can only be estimated here.
   bool get isCountExact {
     final state = this;
     return state is! SessionTagPickerLoaded || state.selectedTags.isEmpty;
   }
 
-  /// At most this many cards can have all the selected tags: the count of
-  /// the rarest selected tag. Null when no tags are selected.
+  /// At most this many cards can match: the count of the rarest required
+  /// tag, and of the chosen topics together. Null when nothing limits it.
   int? get maxCardsWithAllTags {
     final state = this;
-    if (state is! SessionTagPickerLoaded || state.selectedTags.isEmpty) {
-      return null;
-    }
+    if (state is! SessionTagPickerLoaded) return null;
+    final required = selectedTagsList.toSet();
+    final topics = selectedTopics.toSet();
+    if (required.isEmpty && topics.isEmpty) return null;
     int? result;
+    var topicSum = 0;
     state.allTagCounts.forEach((tag, count) {
-      if (state.selectedTags[tag.id] != true) return;
+      if (topics.contains(tag.id)) topicSum += count;
+      if (!required.contains(tag.id)) return;
       if (result == null || count < result!) result = count;
     });
+    if (topics.isNotEmpty && (result == null || topicSum < result!)) {
+      result = topicSum;
+    }
     return result ?? 0;
   }
 }

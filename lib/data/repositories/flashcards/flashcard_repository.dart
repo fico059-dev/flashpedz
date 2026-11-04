@@ -73,15 +73,19 @@ ImportAction decideImportAction(
   AnkiCard card,
   Flashcard? existing, {
   required bool importTags,
+  Tag? topic,
 }) {
   if (existing == null) return ImportAction.add;
   final plan = ImportImagePlan.of(card, existing);
-  final tagsChanged =
-      importTags &&
-      !_sameSet(
-        existing.tags.map((t) => t.id),
-        ankiTagsToTags(card.tags).map((t) => t.id),
-      );
+  final tagsChanged = !_sameSet(
+    existing.tags.map((t) => t.id),
+    importedCardTags(
+      card,
+      existing,
+      importTags: importTags,
+      topic: topic,
+    ).map((t) => t.id),
+  );
   if (existing.question != card.question ||
       existing.answer != card.answer ||
       tagsChanged ||
@@ -108,6 +112,22 @@ String? reusableOcclusionUrl(AnkiCard card, Flashcard existing) {
     }
   }
   return null;
+}
+
+/// The tags an imported card gets: the deck's tags (or else the ones it
+/// already has), and the [topic] chosen for the import in place of any
+/// other topic.
+List<Tag> importedCardTags(
+  AnkiCard card,
+  Flashcard? existing, {
+  required bool importTags,
+  Tag? topic,
+}) {
+  final tags = importTags
+      ? ankiTagsToTags(card.tags)
+      : existing?.tags ?? const <Tag>[];
+  if (topic == null) return tags;
+  return [...tags.where((t) => !t.isTopic), topic];
 }
 
 bool _sameSet(Iterable<String> a, Iterable<String> b) {
@@ -638,6 +658,7 @@ class FlashcardRepository {
     required List<AnkiCard> cards,
     required bool importTags,
     required void Function(int processed, int total) onProgress,
+    Tag? topic,
   }) async {
     const batchSize = 100;
     var imported = 0;
@@ -693,7 +714,12 @@ class FlashcardRepository {
         if (url != null) card = card.withOcclusionUrl(url);
       }
 
-      switch (decideImportAction(card, match, importTags: importTags)) {
+      switch (decideImportAction(
+        card,
+        match,
+        importTags: importTags,
+        topic: topic,
+      )) {
         case ImportAction.add:
           toImport.add(card);
         case ImportAction.update:
@@ -766,7 +792,12 @@ class FlashcardRepository {
               packId: packId,
               question: card.question,
               answer: card.answer,
-              tags: importTags ? ankiTagsToTags(card.tags) : const [],
+              tags: importedCardTags(
+                card,
+                null,
+                importTags: importTags,
+                topic: topic,
+              ),
               questionImageUrl: questionUrl,
               answerImageUrl: answerUrl,
               sourceKey: card.sourceKey,
@@ -845,9 +876,15 @@ class FlashcardRepository {
     // Changed cards are updated in place, so students keep their progress.
     var updated = 0;
     var failedUpdates = 0;
-    if (toUpdate.isNotEmpty && importTags) {
+    if (toUpdate.isNotEmpty && (importTags || topic != null)) {
       final newTags = {
-        for (final (_, card) in toUpdate) ...ankiTagsToTags(card.tags),
+        for (final (existing, card) in toUpdate)
+          ...importedCardTags(
+            card,
+            existing,
+            importTags: importTags,
+            topic: topic,
+          ),
       };
       await _tagService.setDocuments(
         newTags.map(TagDto.fromTagDomain).toList(),
@@ -877,7 +914,14 @@ class FlashcardRepository {
             partialJson: UpdateFlashcardDto(
               question: card.question,
               answer: card.answer,
-              tags: importTags ? ankiTagsToTags(card.tags).toIdList() : null,
+              tags: importTags || topic != null
+                  ? importedCardTags(
+                      card,
+                      existing,
+                      importTags: importTags,
+                      topic: topic,
+                    ).toIdList()
+                  : null,
             ).toJson(),
             shouldDeleteQuestion: plan.deleteQuestion,
             shouldDeleteAnswer: plan.deleteAnswer,

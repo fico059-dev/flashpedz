@@ -15,6 +15,7 @@ import 'package:flashcards/ui/dialogs/profile/admin_dashboard/flashcard_builder/
 import 'package:flashcards/ui/pages/profile/admin_dashboard/assign_admin_page.dart';
 import 'package:flashcards/ui/pages/profile/admin_dashboard/flashcard_builder/anki_import_page.dart';
 import 'package:flashcards/utils/result.dart';
+import 'package:flashcards/domain/models/flashcards/tag/tag.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -29,6 +30,7 @@ class _FakeFlashcardRepository implements FlashcardRepository {
     required List<AnkiCard> cards,
     required bool importTags,
     required void Function(int processed, int total) onProgress,
+    Tag? topic,
   }) async {
     importedCards = cards;
     onProgress(cards.length, cards.length);

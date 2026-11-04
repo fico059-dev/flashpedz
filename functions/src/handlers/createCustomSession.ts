@@ -22,7 +22,44 @@ type RequstDataDto = {
   name?: string | null;
   /** Sent by app 1.1.0+; older versions expect any-tag matching. */
   matchAllTags?: boolean;
+  /** Cards must have one of these topic tags. */
+  topics?: string[];
+  /** Cards with any of these tags are left out. */
+  excludeTags?: string[];
 };
+
+/**
+ * Keeps the cards that have one of the topics and none of the excluded
+ * tags. Empty lists don't filter.
+ * @param {T[]} flashcards Cards to filter.
+ * @param {string[]} topics Topic tags, a card needs one of them.
+ * @param {string[]} excludeTags Tags whose cards are left out.
+ * @return {T[]} The matching cards.
+ */
+export function filterByTopicsAndExclusions<T extends {tags?: string[]}>(
+  flashcards: T[],
+  topics: string[],
+  excludeTags: string[],
+): T[] {
+  if (topics.length === 0 && excludeTags.length === 0) return flashcards;
+  const excluded = new Set(excludeTags);
+  return flashcards.filter((flashcard) => {
+    const cardTags = flashcard.tags ?? [];
+    if (cardTags.some((tag) => excluded.has(tag))) return false;
+    return topics.length === 0 || cardTags.some((tag) => topics.includes(tag));
+  });
+}
+
+/**
+ * The strings of a list sent by the app, or none.
+ * @param {unknown} value The value sent.
+ * @return {string[]} Its strings.
+ */
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ?
+    value.filter((v): v is string => typeof v === "string") :
+    [];
+}
 
 /** Longest custom session name, also enforced by renameCustomSession. */
 export const maxSessionNameLength = 60;
@@ -93,6 +130,8 @@ export async function createCustomSessionHandler(request: CallableRequest) {
       data as RequstDataDto;
     const name = cleanSessionName((data as RequstDataDto).name);
     const matchAllTags = (data as RequstDataDto).matchAllTags === true;
+    const topics = stringList((data as RequstDataDto).topics);
+    const excludeTags = stringList((data as RequstDataDto).excludeTags);
 
     if (!profileId || !filter || !packIds || !tags || !sessionSize) {
       const missingParams = getMissingParams({
@@ -164,7 +203,7 @@ export async function createCustomSessionHandler(request: CallableRequest) {
       profileId,
     );
     const filteredFlashcards = filterByTagsAndSlice(
-      flashcardSnapshots,
+      filterByTopicsAndExclusions(flashcardSnapshots, topics, excludeTags),
       tags,
       sessionSize,
       matchAllTags,

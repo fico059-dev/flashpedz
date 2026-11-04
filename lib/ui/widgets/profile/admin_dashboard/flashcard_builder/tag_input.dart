@@ -52,13 +52,29 @@ class _TagInputState extends State<TagInput> {
     widget.onTagRemoved?.call(tag);
   }
 
+  /// A card has one topic: choosing one replaces the previous.
+  void _setTopic(String name) {
+    for (final old in widget.selectedTags.where((t) => t.isTopic).toList()) {
+      widget.onTagRemoved?.call(old);
+    }
+    if (name.trim().isNotEmpty) widget.onTagAdded?.call(Tag.topic(name));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final topic = widget.selectedTags.where((t) => t.isTopic).firstOrNull;
     return Column(
       children: [
+        _TopicField(
+          topic: topic,
+          suggestions: widget.suggestedTags.where((t) => t.isTopic).toList(),
+          onChanged: _setTopic,
+        ),
+        const SizedBox(height: 14),
         Wrap(
           spacing: 5,
           children: widget.selectedTags
+              .where((tag) => !tag.isTopic)
               .map(
                 (tag) =>
                     TagChip(label: tag.name, onDeleted: () => _removeTag(tag)),
@@ -79,7 +95,7 @@ class _TagInputState extends State<TagInput> {
             if (input.isEmpty) return const Iterable<Tag>.empty();
 
             return widget.suggestedTags.where(
-              (tag) => tag.name.toLowerCase().contains(input),
+              (tag) => !tag.isTopic && tag.name.toLowerCase().contains(input),
             );
           },
           displayStringForOption: (Tag tag) => tag.name,
@@ -136,6 +152,120 @@ class _TagInputState extends State<TagInput> {
           },
         ),
       ],
+    );
+  }
+}
+
+/// The card's topic (e.g. Cardiology), used to make custom sessions by
+/// topic. Existing topics are suggested while typing.
+class _TopicField extends StatefulWidget {
+  final Tag? topic;
+  final List<Tag> suggestions;
+  final ValueChanged<String> onChanged;
+
+  const _TopicField({
+    required this.topic,
+    required this.suggestions,
+    required this.onChanged,
+  });
+
+  @override
+  State<_TopicField> createState() => _TopicFieldState();
+}
+
+class _TopicFieldState extends State<_TopicField> {
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode();
+  static const _maxLength = 30;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _choose(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    widget.onChanged(
+      trimmed.length > _maxLength ? trimmed.substring(0, _maxLength) : trimmed,
+    );
+    _controller.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topic = widget.topic;
+    if (topic != null) {
+      return Row(
+        children: [
+          const Icon(Icons.category_outlined, color: Colors.grey, size: 22),
+          const SizedBox(width: 10),
+          Text('Topic', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(width: 10),
+          Flexible(
+            child: InputChip(
+              label: Text(topic.topicName),
+              onDeleted: () => widget.onChanged(''),
+            ),
+          ),
+        ],
+      );
+    }
+    return RawAutocomplete<Tag>(
+      textEditingController: _controller,
+      focusNode: _focusNode,
+      optionsBuilder: (value) {
+        final input = value.text.trim().toLowerCase();
+        return widget.suggestions.where(
+          (tag) => input.isEmpty || tag.topicName.toLowerCase().contains(input),
+        );
+      },
+      displayStringForOption: (tag) => tag.topicName,
+      onSelected: (tag) => _choose(tag.topicName),
+      fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+        return TextField(
+          controller: controller,
+          focusNode: focusNode,
+          maxLength: _maxLength,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            prefixIcon: Icon(
+              Icons.category_outlined,
+              color: Colors.grey,
+              size: 22,
+            ),
+            labelText: 'Topic (optional), e.g. Cardiology',
+            helperText: 'Students can make a custom session of one topic.',
+            border: OutlineInputBorder(),
+            counterText: '',
+          ),
+          onSubmitted: _choose,
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4.0,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 200, maxWidth: 400),
+              child: ListView(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                children: [
+                  for (final option in options)
+                    ListTile(
+                      title: Text(option.topicName),
+                      onTap: () => onSelected(option),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

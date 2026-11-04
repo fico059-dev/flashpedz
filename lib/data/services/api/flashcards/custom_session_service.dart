@@ -77,10 +77,16 @@ class CustomSessionService {
   }
 
   Future<Result<void>> createCustomSession(
-    CreateCustomSessionRequestDto request,
-  ) async {
+    CreateCustomSessionRequestDto request, {
+    List<String> topics = const [],
+    List<String> excludeTags = const [],
+  }) async {
     try {
-      final result = await _functions.createCustomSession(request);
+      await _functions.createCustomSession(
+        request,
+        topics: topics,
+        excludeTags: excludeTags,
+      );
       //final data = result.data as List<dynamic>;
 
       // final snapshots =

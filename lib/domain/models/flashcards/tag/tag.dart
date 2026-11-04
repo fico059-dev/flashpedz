@@ -33,8 +33,12 @@ class Tag extends Equatable {
         ); // Trim leading/trailing underscores
   }
 
-  /// Display formatter: restores spacing, capitalizes words
+  /// Display formatter: restores spacing, capitalizes words. Topics read
+  /// "Topic: Cardiology".
   static String _displayName(String tag) {
+    if (tag.toLowerCase().startsWith(topicTagPrefix)) {
+      return 'Topic: ${_displayName(tag.substring(topicTagPrefix.length))}';
+    }
     return tag
         .replaceAll('__', ' ') // Convert internal separator to space
         .split(' ')
@@ -47,9 +51,24 @@ class Tag extends Equatable {
         .join(' ');
   }
 
+  /// The card's topic (e.g. Cardiology), kept as a tag with a prefix so
+  /// packs count and filter topics like tags.
+  bool get isTopic => id.startsWith(topicTagPrefix);
+
+  /// The topic's name without "Topic: ".
+  String get topicName => isTopic
+      ? Tag.fromId(id.substring(topicTagPrefix.length)).name
+      : name;
+
+  /// The tag holding the topic [name].
+  factory Tag.topic(String name) => Tag.fromName('$topicTagPrefix${name.trim()}');
+
   @override
   List<Object?> get props => [id, name];
 }
+
+/// Tag ids starting with this are topics.
+const topicTagPrefix = 'topic--';
 
 Map<String, int> updatePackTagCounts(
   Map<String, int> packTagsMap,

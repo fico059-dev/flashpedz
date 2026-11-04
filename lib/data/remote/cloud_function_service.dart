@@ -13,12 +13,18 @@ import 'package:flashcards/utils/result.dart' as res;
 class CloudFunctionService {
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
+  /// [topics]: cards must have one of these topics. [excludeTags]: cards
+  /// with any of these tags are left out.
   Future<HttpsCallableResult> createCustomSession(
-    CreateCustomSessionRequestDto request,
-  ) async {
-    return await _functions
-        .httpsCallable("createCustomSession")
-        .call(request.toJson());
+    CreateCustomSessionRequestDto request, {
+    List<String> topics = const [],
+    List<String> excludeTags = const [],
+  }) async {
+    return await _functions.httpsCallable("createCustomSession").call({
+      ...request.toJson(),
+      if (topics.isNotEmpty) 'topics': topics,
+      if (excludeTags.isNotEmpty) 'excludeTags': excludeTags,
+    });
   }
 
   /// Returns the name that was saved.

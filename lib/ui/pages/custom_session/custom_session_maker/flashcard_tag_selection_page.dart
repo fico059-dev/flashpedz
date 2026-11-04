@@ -49,11 +49,12 @@ class _FlashcardTagSelectionPageState extends State<FlashcardTagSelectionPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CardFactory.info(
-                  title: Text("Select tags"),
+                  title: Text("Choose topics and tags"),
                   subtitle: Text(
-                    "Only cards that have ALL the tags you select are included, "
-                    "e.g. Neoreview + 2025 gives cards tagged with both. "
-                    "Select no tags to include every card.",
+                    "Topic: cards of any topic you choose. Tags: cards that "
+                    "have ALL the tags you tick, e.g. Neoreview + 2025. "
+                    "Tap ⊘ to leave out the cards with a tag. Choose nothing "
+                    "to include every card.",
                   ),
                 ),
 
@@ -78,23 +79,70 @@ class _FlashcardTagSelectionPageState extends State<FlashcardTagSelectionPage> {
                         }
 
                         final query = _query.trim().toLowerCase();
+                        final topics = allTagCounts.entries
+                            .where((e) => e.key.isTopic)
+                            .toList();
                         final entries = allTagCounts.entries
                             .where(
                               (e) =>
-                                  query.isEmpty ||
-                                  e.key.name.toLowerCase().contains(query),
+                                  !e.key.isTopic &&
+                                  (query.isEmpty ||
+                                      e.key.name.toLowerCase().contains(query)),
                             )
                             .toList();
                         final selected = allTagCounts.keys
-                            .where((tag) => selectedTags[tag.id] == true)
+                            .where(
+                              (tag) =>
+                                  !tag.isTopic && selectedTags[tag.id] == true,
+                            )
                             .toList();
+                        final selectedTopics = allTagCounts.keys
+                            .where(
+                              (tag) =>
+                                  tag.isTopic && selectedTags[tag.id] == true,
+                            )
+                            .toList();
+                        final excluded = allTagCounts.keys
+                            .where((tag) => selectedTags[tag.id] == false)
+                            .toList();
+                        final tagCount = allTagCounts.length - topics.length;
 
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _SelectionSummary(selected: selected),
+                            _SelectionSummary(
+                              selected: selected,
+                              topics: selectedTopics,
+                              excluded: excluded,
+                            ),
                             SizedBox(height: 12),
-                            if (allTagCounts.length > 8)
+                            if (topics.isNotEmpty) ...[
+                              Text('Topic', style: context.text.titleMedium),
+                              SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  for (final topic in topics)
+                                    FilterChip(
+                                      label: Text(
+                                        '${topic.key.topicName} '
+                                        '(${topic.value})',
+                                      ),
+                                      selected:
+                                          selectedTags[topic.key.id] == true,
+                                      onSelected: (_) => context
+                                          .read<SessionTagPickerCubit>()
+                                          .toggleTag(topic.key),
+                                    ),
+                                ],
+                              ),
+                              SizedBox(height: 20),
+                              if (tagCount > 0)
+                                Text('Tags', style: context.text.titleMedium),
+                              SizedBox(height: 4),
+                            ],
+                            if (tagCount > 8)
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 8),
                                 child: TextField(
@@ -136,6 +184,8 @@ class _FlashcardTagSelectionPageState extends State<FlashcardTagSelectionPage> {
                                   tagCount: tagCount,
                                   isSelected:
                                       selectedTags[tagCount.key.id] == true,
+                                  isExcluded:
+                                      selectedTags[tagCount.key.id] == false,
                                 );
                               },
                             ),
@@ -156,12 +206,49 @@ class _FlashcardTagSelectionPageState extends State<FlashcardTagSelectionPage> {
 
 class _SelectionSummary extends StatelessWidget {
   final List<Tag> selected;
+  final List<Tag> topics;
+  final List<Tag> excluded;
 
-  const _SelectionSummary({required this.selected});
+  const _SelectionSummary({
+    required this.selected,
+    required this.topics,
+    required this.excluded,
+  });
 
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<SessionTagPickerCubit>();
+    final others = [
+      if (topics.isNotEmpty)
+        _ChipLine(
+          label: topics.length == 1 ? 'Topic:' : 'Any of these topics:',
+          chips: [
+            for (final topic in topics)
+              InputChip(
+                label: Text(topic.topicName),
+                onDeleted: () => cubit.toggleTag(topic),
+                visualDensity: VisualDensity.compact,
+              ),
+          ],
+        ),
+      if (excluded.isNotEmpty)
+        _ChipLine(
+          label: 'Leaving out cards with:',
+          chips: [
+            for (final tag in excluded)
+              InputChip(
+                avatar: Icon(
+                  Icons.block,
+                  size: 16,
+                  color: context.colors.error,
+                ),
+                label: Text(tag.isTopic ? tag.topicName : tag.name),
+                onDeleted: () => cubit.toggleExcluded(tag),
+                visualDensity: VisualDensity.compact,
+              ),
+          ],
+        ),
+    ];
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -169,7 +256,7 @@ class _SelectionSummary extends StatelessWidget {
         color: context.colors.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: selected.isEmpty
+      child: selected.isEmpty && others.isEmpty
           ? Row(
               children: [
                 Icon(Icons.all_inclusive, color: context.colors.primary),
@@ -180,46 +267,57 @@ class _SelectionSummary extends StatelessWidget {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        selected.length == 1
-                            ? "Cards tagged:"
-                            : "Cards with all ${selected.length} tags:",
-                        style: context.text.labelLarge,
-                      ),
-                    ),
-                    TextButton(
+                ...others,
+                if (selected.isEmpty)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
                       onPressed: cubit.clearSelection,
                       child: Text("Clear"),
                     ),
-                  ],
-                ),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (var i = 0; i < selected.length; i++) ...[
-                      if (i > 0)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            'AND',
-                            style: context.text.labelSmall?.copyWith(
-                              color: context.colors.onSurfaceVariant,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                  ),
+                if (selected.isNotEmpty)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          selected.length == 1
+                              ? "Cards tagged:"
+                              : "Cards with all ${selected.length} tags:",
+                          style: context.text.labelLarge,
                         ),
-                      InputChip(
-                        label: Text(selected[i].name),
-                        onDeleted: () => cubit.toggleTag(selected[i]),
-                        visualDensity: VisualDensity.compact,
+                      ),
+                      TextButton(
+                        onPressed: cubit.clearSelection,
+                        child: Text("Clear"),
                       ),
                     ],
-                  ],
-                ),
+                  ),
+                if (selected.isNotEmpty)
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (var i = 0; i < selected.length; i++) ...[
+                        if (i > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              'AND',
+                              style: context.text.labelSmall?.copyWith(
+                                color: context.colors.onSurfaceVariant,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        InputChip(
+                          label: Text(selected[i].name),
+                          onDeleted: () => cubit.toggleTag(selected[i]),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ],
+                  ),
               ],
             ),
     );
@@ -229,18 +327,68 @@ class _SelectionSummary extends StatelessWidget {
 class _TagCountItem extends StatelessWidget {
   final MapEntry<Tag, int> tagCount;
   final bool isSelected;
+  final bool isExcluded;
 
-  const _TagCountItem({required this.tagCount, required this.isSelected});
+  const _TagCountItem({
+    required this.tagCount,
+    required this.isSelected,
+    required this.isExcluded,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return CheckboxListTile(
-      title: Text(tagCount.key.name),
-      subtitle: Text('${tagCount.value} flashcards'),
-      value: isSelected,
-      onChanged: (value) {
-        context.read<SessionTagPickerCubit>().toggleTag(tagCount.key);
-      },
+    final cubit = context.read<SessionTagPickerCubit>();
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Checkbox(
+        value: isSelected,
+        onChanged: (_) => cubit.toggleTag(tagCount.key),
+      ),
+      title: Text(
+        tagCount.key.name,
+        style: isExcluded
+            ? TextStyle(
+                decoration: TextDecoration.lineThrough,
+                color: context.colors.error,
+              )
+            : null,
+      ),
+      subtitle: Text(
+        isExcluded
+            ? 'Left out · ${tagCount.value} flashcards'
+            : '${tagCount.value} flashcards',
+      ),
+      onTap: () => cubit.toggleTag(tagCount.key),
+      trailing: IconButton(
+        tooltip: isExcluded ? 'Include these cards again' : 'Leave these out',
+        isSelected: isExcluded,
+        icon: const Icon(Icons.block),
+        color: isExcluded ? context.colors.error : null,
+        onPressed: () => cubit.toggleExcluded(tagCount.key),
+      ),
+    );
+  }
+}
+
+/// A label with chips under it, in the selection summary.
+class _ChipLine extends StatelessWidget {
+  final String label;
+  final List<Widget> chips;
+
+  const _ChipLine({required this.label, required this.chips});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 4,
+        children: [
+          Text(label, style: context.text.labelLarge),
+          Wrap(spacing: 6, runSpacing: 6, children: chips),
+        ],
+      ),
     );
   }
 }

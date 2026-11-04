@@ -1,6 +1,8 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flashcards/bloc/custom_session/session_limit/session_limit_cubit.dart';
 import 'package:flashcards/bloc/custom_session/session_limit/session_limit_state.dart';
+import 'package:flashcards/bloc/custom_session/session_tag_picker/session_tag_picker_cubit.dart';
+import 'package:flashcards/bloc/custom_session/session_tag_picker/session_tag_picker_state.dart';
 import 'package:flashcards/domain/enums/pack_selected_filter.dart';
 import 'package:flashcards/domain/models/flashcards/admin_pack/admin_pack.dart';
 import 'package:flashcards/domain/models/flashcards/simple_pack/simple_pack.dart';
@@ -158,7 +160,11 @@ class _LoadedContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final picked = context.read<SessionTagPickerCubit>().state;
+    final topics = picked.selectedTopics;
+    final excluded = picked.excludedTags;
     final defaultName = defaultSessionName(
+      topicNames: topics.map((id) => Tag.fromId(id).topicName).toList(),
       tagNames: selectedTags.map((tag) => tag.name).toList(),
       packNames: selectedPacks.packNames,
     );
@@ -171,6 +177,8 @@ class _LoadedContent extends StatelessWidget {
         filter: filter,
         packIds: selectedPacks.packIds,
         selectedTags: selectedTags.toIdList(),
+        topics: topics,
+        excludeTags: excluded,
         name: typedName.isEmpty ? defaultName : typedName,
       );
     }
@@ -189,10 +197,10 @@ class _LoadedContent extends StatelessWidget {
         if (!isEstimatePrecise)
           CardFactory.warning(
             isThreeLine: true,
-            title: Text("Only cards with all selected tags are included."),
+            title: Text("This number is an estimate."),
             subtitle: Text(
-              "Fewer cards may match all the tags than this estimate. The "
-              "session will contain all the matching cards, up to your number.",
+              "Fewer cards may match your topics and tags. The session will "
+              "contain all the matching cards, up to your number.",
             ),
           ),
 
@@ -249,6 +257,30 @@ class _LoadedContent extends StatelessWidget {
                     .map((tag) => TagChip(label: tag.name))
                     .toList(),
               ),
+
+        if (topics.isNotEmpty) ...[
+          SizedBox(),
+          _buildSectionTitle('Topic'),
+          Wrap(
+            spacing: 3,
+            runSpacing: 3,
+            children: [
+              for (final id in topics)
+                TagChip(label: Tag.fromId(id).topicName),
+            ],
+          ),
+        ],
+        if (excluded.isNotEmpty) ...[
+          SizedBox(),
+          _buildSectionTitle('Left Out'),
+          Wrap(
+            spacing: 3,
+            runSpacing: 3,
+            children: [
+              for (final id in excluded) TagChip(label: Tag.fromId(id).name),
+            ],
+          ),
+        ],
 
         SizedBox(height: 5),
         Center(

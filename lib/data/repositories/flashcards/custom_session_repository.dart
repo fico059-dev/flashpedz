@@ -75,6 +75,8 @@ class CustomSessionRepository {
     required List<String> tags,
     required List<String> packIds,
     String? name,
+    List<String> topics = const [],
+    List<String> excludeTags = const [],
   }) async {
     final request = CreateCustomSessionRequestDto(
       profileId: _getUid(),
@@ -84,7 +86,11 @@ class CustomSessionRepository {
       sessionSize: sessionSize,
       name: name,
     );
-    return await _customSessionService.createCustomSession(request);
+    return await _customSessionService.createCustomSession(
+      request,
+      topics: topics,
+      excludeTags: excludeTags,
+    );
   }
 
   Future<Result<void>> answeredCorrect(String sessionId) async {

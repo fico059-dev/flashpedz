@@ -38,6 +38,8 @@ class SessionLimitCubit extends Cubit<SessionLimitState> {
     required List<String> selectedTags,
     required List<String> packIds,
     String? name,
+    List<String> topics = const [],
+    List<String> excludeTags = const [],
   }) async {
     final state = this.state;
     if (state is! SessionLimitLoaded) return;
@@ -60,6 +62,8 @@ class SessionLimitCubit extends Cubit<SessionLimitState> {
       tags: selectedTags,
       packIds: packIds,
       name: name,
+      topics: topics,
+      excludeTags: excludeTags,
     );
     switch (result) {
       case Error<void>(:final error):
@@ -87,13 +91,17 @@ class SessionLimitCubit extends Cubit<SessionLimitState> {
   }
 }
 
-/// Name used when the student doesn't type one: the selected tags, or else
-/// the packs, e.g. "Neoreview + 2025" or "Cardiology, Renal".
+/// Name used when the student doesn't type one: the topics, the selected
+/// tags, or else the packs, e.g. "Cardiology", "Neoreview + 2025" or
+/// "Cardiology, Renal".
 String defaultSessionName({
   required List<String> tagNames,
   required List<String> packNames,
+  List<String> topicNames = const [],
 }) {
-  final name = tagNames.isNotEmpty
+  final name = topicNames.isNotEmpty
+      ? [topicNames.join(' / '), ...tagNames].join(' + ')
+      : tagNames.isNotEmpty
       ? tagNames.join(' + ')
       : packNames.isNotEmpty
       ? packNames.join(', ')

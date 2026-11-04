@@ -48,6 +48,13 @@ class _View extends StatefulWidget {
 
 class _ViewState extends State<_View> {
   bool _importTags = false;
+  final _topic = TextEditingController();
+
+  @override
+  void dispose() {
+    _topic.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickFile() async {
     // FileType.any: iOS doesn't know the .apkg type, so the extension is
@@ -114,12 +121,14 @@ class _ViewState extends State<_View> {
                         result: result,
                         packName: widget.pack.packName,
                         importTags: _importTags,
+                        topic: _topic,
                         onImportTagsChanged: (value) =>
                             setState(() => _importTags = value),
                         onImport: () =>
                             context.read<AnkiImportCubit>().importCards(
                               packId: widget.pack.packId,
                               importTags: _importTags,
+                              topic: _topic.text,
                             ),
                         onPickAnother: _pickFile,
                       ),
@@ -304,6 +313,7 @@ class _Preview extends StatelessWidget {
   final AnkiParseResult result;
   final String packName;
   final bool importTags;
+  final TextEditingController topic;
   final ValueChanged<bool> onImportTagsChanged;
   final VoidCallback onImport;
   final VoidCallback onPickAnother;
@@ -313,6 +323,7 @@ class _Preview extends StatelessWidget {
     required this.result,
     required this.packName,
     required this.importTags,
+    required this.topic,
     required this.onImportTagsChanged,
     required this.onImport,
     required this.onPickAnother,
@@ -396,6 +407,21 @@ class _Preview extends StatelessWidget {
                   value: importTags,
                   onChanged: onImportTagsChanged,
                 ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: topic,
+                maxLength: 30,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.category_outlined),
+                  labelText: "Topic for these cards (optional)",
+                  hintText: "e.g. Cardiology",
+                  helperText:
+                      "Students can make a custom session of one topic.",
+                  border: OutlineInputBorder(),
+                  counterText: '',
+                ),
+              ),
               const SizedBox(height: 12),
               Text(
                 cards.length > _sampleSize

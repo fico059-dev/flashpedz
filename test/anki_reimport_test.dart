@@ -2,6 +2,7 @@ import 'package:flashcards/data/repositories/flashcards/flashcard_repository.dar
 import 'package:flashcards/data/services/anki/anki_import_models.dart';
 import 'package:flashcards/data/services/anki/anki_tags.dart';
 import 'package:flashcards/domain/models/flashcards/flashcard/flashcard.dart';
+import 'package:flashcards/domain/models/flashcards/tag/tag.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Flashcard existing({
@@ -101,5 +102,38 @@ void main() {
     final byHand = existing(questionImageUrl: 'https://x/q.jpg');
     expect(ImportImagePlan.of(card(), byHand).deleteQuestion, isFalse);
     expect(decide(card(), byHand), ImportAction.link);
+  });
+
+  test('a topic for the import is added to the cards', () {
+    final cardio = Tag.topic('Cardiology');
+    expect(
+      importedCardTags(
+        card(tags: ['Neo']),
+        null,
+        importTags: true,
+        topic: cardio,
+      ).map((t) => t.id),
+      ['neo', 'topic--cardiology'],
+    );
+    // Without importing tags, the card's own tags are kept and its old
+    // topic replaced.
+    final e = existing(
+      sourceKey: 'anki:g1',
+      sourceImages: '/',
+      tags: ['Mine', 'topic--renal'],
+    );
+    expect(
+      importedCardTags(card(), e, importTags: false, topic: cardio)
+          .map((t) => t.id),
+      ['mine', 'topic--cardiology'],
+    );
+    expect(
+      decideImportAction(card(), e, importTags: false, topic: cardio),
+      ImportAction.update,
+    );
+    expect(
+      decideImportAction(card(), e, importTags: false),
+      ImportAction.unchanged,
+    );
   });
 }

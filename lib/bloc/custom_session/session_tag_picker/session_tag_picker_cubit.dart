@@ -53,6 +53,26 @@ class SessionTagPickerCubit extends Cubit<SessionTagPickerState> {
     );
   }
 
+  /// Leaves out the cards with [tag], or stops leaving them out.
+  void toggleExcluded(Tag tag) {
+    final state = this.state;
+    if (state is! SessionTagPickerLoaded) return;
+
+    final excluded = state.selectedTags[tag.id] == false;
+    final newMap = excluded
+        ? deleteMapEntry(state.selectedTags, tag.id)
+        : updateMapEntry(state.selectedTags, tag.id, false);
+    emit(
+      state.copyWith(
+        selectedTags: newMap,
+        firstOptionChecked: _getFirstOptionState(
+          allTagCounts: state.allTagCounts,
+          selectedTags: newMap,
+        ),
+      ),
+    );
+  }
+
   /// Back to no tag filter, so every card can be in the session.
   void clearSelection() {
     final state = this.state;

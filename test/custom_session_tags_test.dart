@@ -5,6 +5,7 @@ import 'package:flashcards/data/services/api/dto/requests/create_custom_session/
 import 'package:flashcards/domain/enums/pack_selected_filter.dart';
 import 'package:flashcards/domain/models/flashcards/admin_pack/admin_pack.dart';
 import 'package:flashcards/domain/models/flashcards/custom_session_summary/custom_session_summary.dart';
+import 'package:flashcards/domain/models/flashcards/tag/tag.dart';
 import 'package:flashcards/ui/dialogs/previous_session/rename_session_dialog.dart';
 import 'package:flashcards/ui/pages/custom_session/custom_session_maker/flashcard_tag_selection_page.dart';
 import 'package:flashcards/ui/widgets/previous_sessions/previous_session_card.dart';
@@ -27,6 +28,16 @@ const _packs = [
     flashcardsCount: 60,
     isPaid: false,
     tagCounts: {'2025': 10, 'acid__base': 5},
+  ),
+];
+
+const _packsWithTopics = [
+  AdminPack(
+    packId: 'p3',
+    packName: 'Mixed',
+    flashcardsCount: 100,
+    isPaid: false,
+    tagCounts: {'topic--cardiology': 40, 'topic--renal': 20, 'hard': 15},
   ),
 ];
 
@@ -101,14 +112,15 @@ void main() {
 
     expect(find.text('No tags selected: all cards included'), findsOneWidget);
     final names = tester
-        .widgetList<CheckboxListTile>(find.byType(CheckboxListTile))
+        .widgetList<ListTile>(find.byType(ListTile))
+        .where((tile) => tile.trailing is IconButton)
         .map((tile) => (tile.title as Text).data)
         .toList();
     expect(names, ['2025', 'Acid Base', 'Cardio', 'Neoreview']);
 
     await tester.tap(find.text('Neoreview'));
     await tester.pump();
-    await tester.tap(find.widgetWithText(CheckboxListTile, '2025'));
+    await tester.tap(find.widgetWithText(ListTile, '2025'));
     await tester.pump();
     expect(find.text('Cards with all 2 tags:'), findsOneWidget);
     expect(find.text('AND'), findsOneWidget);
@@ -116,6 +128,72 @@ void main() {
     await tester.tap(find.text('Clear'));
     await tester.pump();
     expect(find.text('No tags selected: all cards included'), findsOneWidget);
+  });
+
+  test('topics: one of them; excluded tags left out', () {
+    final cubit = SessionTagPickerCubit()..loadAllTags(_packsWithTopics);
+    final state = cubit.state as SessionTagPickerLoaded;
+    final byId = {for (final t in state.allTagCounts.keys) t.id: t};
+    expect(byId['topic--cardiology']!.isTopic, isTrue);
+    expect(byId['topic--cardiology']!.name, 'Topic: Cardiology');
+    expect(byId['topic--cardiology']!.topicName, 'Cardiology');
+
+    cubit
+      ..toggleTag(byId['topic--cardiology']!)
+      ..toggleTag(byId['topic--renal']!)
+      ..toggleExcluded(byId['hard']!);
+    expect(cubit.state.selectedTopics, ['topic--cardiology', 'topic--renal']);
+    expect(cubit.state.selectedTagsList, isEmpty);
+    expect(cubit.state.excludedTags, ['hard']);
+    expect(cubit.state.isCountExact, isFalse);
+    expect(cubit.state.maxCardsWithAllTags, 60);
+
+    // Ticking an excluded tag requires it instead.
+    cubit.toggleTag(byId['hard']!);
+    expect(cubit.state.excludedTags, isEmpty);
+    expect(cubit.state.selectedTagsList, ['hard']);
+    expect(cubit.state.maxCardsWithAllTags, 15);
+  });
+
+  test('topic tags and session names', () {
+    final topic = Tag.topic(' Cardiology ');
+    expect(topic.id, 'topic--cardiology');
+    expect(topic.topicName, 'Cardiology');
+    expect(Tag.fromId('neoreview').isTopic, isFalse);
+    expect(
+      defaultSessionName(
+        topicNames: ['Cardiology', 'Renal'],
+        tagNames: ['2025'],
+        packNames: ['Neo'],
+      ),
+      'Cardiology / Renal + 2025',
+    );
+  });
+
+  testWidgets('tag page: topics and leaving tags out', (tester) async {
+    final cubit = SessionTagPickerCubit();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightThemeData,
+        home: BlocProvider.value(
+          value: cubit,
+          child: const FlashcardTagSelectionPage(packs: _packsWithTopics),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Cardiology (40)'), findsOneWidget);
+    // Topics aren't in the tag list.
+    expect(find.widgetWithText(ListTile, 'Topic: Cardiology'), findsNothing);
+
+    await tester.tap(find.text('Cardiology (40)'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Leave these out'));
+    await tester.pump();
+    expect(find.text('Topic:'), findsOneWidget);
+    expect(find.text('Leaving out cards with:'), findsOneWidget);
+    expect(find.text('Left out · 15 flashcards'), findsOneWidget);
+    expect(cubit.state.excludedTags, ['hard']);
   });
 
   testWidgets('session card shows the name and renames', (tester) async {

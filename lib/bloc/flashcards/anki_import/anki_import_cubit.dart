@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flashcards/bloc/flashcards/anki_import/anki_import_state.dart';
 import 'package:flashcards/data/repositories/flashcards/flashcard_repository.dart';
 import 'package:flashcards/data/services/anki/anki_import_service.dart';
+import 'package:flashcards/domain/models/flashcards/tag/tag.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class AnkiImportCubit extends Cubit<AnkiImportState> {
@@ -37,6 +38,7 @@ class AnkiImportCubit extends Cubit<AnkiImportState> {
   Future<void> importCards({
     required String packId,
     required bool importTags,
+    String topic = '',
   }) async {
     final current = state;
     if (current is! AnkiImportPreview) return;
@@ -46,6 +48,7 @@ class AnkiImportCubit extends Cubit<AnkiImportState> {
       packId: packId,
       cards: current.result.cards,
       importTags: importTags,
+      topic: topic.trim().isEmpty ? null : Tag.topic(topic),
       onProgress: (processed, total) {
         if (isClosed) return;
         emit(AnkiImportImporting(processed: processed, total: total));
