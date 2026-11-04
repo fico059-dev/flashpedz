@@ -110,6 +110,22 @@ class CustomSessionRepository {
     );
   }
 
+  /// Sets where the session is, e.g. back one card when an answer is
+  /// undone.
+  Future<Result<void>> setSessionProgress(
+    String sessionId, {
+    required int currentIndex,
+    required int correctCount,
+  }) {
+    return _customSessionService.patchCustomSession(
+      sessionId: sessionId,
+      dto: CustomSessionPatchDto(
+        currentIndex: currentIndex,
+        correctCount: correctCount,
+      ),
+    );
+  }
+
   /// Returns the name that was saved.
   Future<Result<String>> renameSession(String sessionId, String name) {
     return _customSessionService.renameCustomSession(

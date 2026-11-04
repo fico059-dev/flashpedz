@@ -1,6 +1,7 @@
 // ignore_for_file: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flashcards/bloc/flashcards/flashcard/flashcard_bloc.dart';
+import 'package:flashcards/bloc/flashcards/flashcard/flashcard_event.dart';
 import 'package:flashcards/bloc/flashcards/flashcard/flashcard_state.dart';
 import 'package:flashcards/bloc/profile/profile_reader/profile_reader_cubit.dart';
 import 'package:flashcards/bloc/profile/profile_reader/profile_reader_state.dart';
@@ -126,6 +127,45 @@ void main() {
     expect(bloc.state.statRecords[1].card.reps, 1);
 
     // Let the background saves finish.
+    await tester.pump(const Duration(milliseconds: 10));
+  });
+
+  testWidgets('undo shows the last card again with its old progress', (
+    tester,
+  ) async {
+    final bloc = FlashcardBloc(
+      flashcardRepo: _Fake(),
+      fcpRepo: _Fake(),
+      authRepo: _Auth(),
+      profileRepo: _Fake(),
+      ppRepo: _Fake(),
+      localStorageService: _Fake(),
+    );
+    final records = [_record('c1'), _record('c2'), _record('c3')];
+    bloc.emit(
+      FlashcardState(
+        status: FlashcardStatus.loaded,
+        statRecords: records,
+        flashcard: records[0].flashcard,
+        answerVisible: true,
+      ),
+    );
+    final streak = Streak(count: 0, lastStreakDate: DateTime(2026));
+    expect(bloc.canUndo, isFalse);
+
+    bloc.add(FlashcardRatingGiven(rating: fsrs.Rating.good, userStreak: streak));
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(bloc.state.currentCardIndex, 1);
+    expect(bloc.state.statRecords[0].card.reps, 1);
+    expect(bloc.canUndo, isTrue);
+
+    bloc.add(FlashcardUndoPressed());
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(bloc.state.currentCardIndex, 0);
+    expect(bloc.state.flashcard?.id, 'c1');
+    expect(bloc.state.answerVisible, isFalse);
+    expect(bloc.state.statRecords[0].card.reps, 0);
+    expect(bloc.canUndo, isFalse);
     await tester.pump(const Duration(milliseconds: 10));
   });
 }

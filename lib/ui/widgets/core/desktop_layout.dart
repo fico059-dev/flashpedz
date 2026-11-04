@@ -37,7 +37,8 @@ class ReadableWidth extends StatelessWidget {
 }
 
 /// Keyboard shortcuts while reviewing cards, like in Anki: Space or Enter
-/// shows the answer, 1-4 rate Again, Hard, Good, Easy. On wide screens a
+/// shows the answer, 1-4 rate Again, Hard, Good, Easy, Z (or Cmd/Ctrl+Z)
+/// undoes the last answer. On wide screens a
 /// short reminder is shown at the bottom.
 ///
 /// The keys are caught for the whole window while this screen is on top, so
@@ -47,12 +48,14 @@ class ReadableWidth extends StatelessWidget {
 class ReviewShortcuts extends StatefulWidget {
   final VoidCallback onShowAnswer;
   final ValueChanged<fsrs.Rating> onRate;
+  final VoidCallback? onUndo;
   final Widget child;
 
   const ReviewShortcuts({
     super.key,
     required this.onShowAnswer,
     required this.onRate,
+    this.onUndo,
     required this.child,
   });
 
@@ -105,6 +108,15 @@ class _ReviewShortcutsState extends State<ReviewShortcuts> {
     // Not under a dialog, menu or another screen.
     if (!(ModalRoute.of(context)?.isCurrent ?? true)) return false;
     final keyboard = HardwareKeyboard.instance;
+    final onUndo = widget.onUndo;
+    if (onUndo != null &&
+        event.logicalKey == LogicalKeyboardKey.keyZ &&
+        !keyboard.isAltPressed &&
+        !keyboard.isShiftPressed &&
+        !_typing()) {
+      onUndo();
+      return true;
+    }
     if (keyboard.isMetaPressed ||
         keyboard.isControlPressed ||
         keyboard.isAltPressed) {
@@ -139,7 +151,7 @@ class _ReviewShortcutsState extends State<ReviewShortcuts> {
             padding: const EdgeInsets.only(bottom: 10, top: 4),
             child: Text(
               'Keyboard: Space shows the answer · 1 Again · 2 Hard · '
-              '3 Good · 4 Easy',
+              '3 Good · 4 Easy${widget.onUndo != null ? ' · Z Undo' : ''}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),

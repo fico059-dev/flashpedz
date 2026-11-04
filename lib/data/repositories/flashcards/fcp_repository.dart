@@ -615,6 +615,19 @@ class FcpRepository {
     return Result.ok(null);
   }
 
+  /// Puts a card's progress back as it was before its last rating (Undo).
+  /// Firestore applies writes in order, so this lands after the rating's
+  /// save even if that is still on its way.
+  Future<Result<void>> restoreCard({required StatRecord before}) async {
+    final result = await _fcpService.updateDocument(
+      _getUid(),
+      before.flashcardId,
+      UpdateFcpDataDto(fsrsCard: before.card).toJson(),
+    );
+    _packsCache.invalidate();
+    return result;
+  }
+
   /// The cards of the pack the user has studied, from the device when its
   /// list matches the server's count, otherwise read again from the server.
   Future<Result<Set<String>>> _seenFlashcardIds({

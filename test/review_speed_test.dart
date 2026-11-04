@@ -39,6 +39,18 @@ class _NeverSavingSessionRepo implements CustomSessionRepository {
     return Completer<Result<void>>().future;
   }
 
+  final positions = <(int, int)>[];
+
+  @override
+  Future<Result<void>> setSessionProgress(
+    String sessionId, {
+    required int currentIndex,
+    required int correctCount,
+  }) async {
+    positions.add((currentIndex, correctCount));
+    return Result.ok(null);
+  }
+
   @override
   Future<Result<void>> answeredWrong(String sessionId) {
     answered++;
@@ -77,6 +89,21 @@ class _FcpRepo implements FcpRepository {
       ),
     );
   }
+
+  final restored = <StatRecord>[];
+
+  @override
+  Future<Result<void>> restoreCard({required StatRecord before}) async {
+    restored.add(before);
+    return Result.ok(null);
+  }
+
+  /// Bookmark saves wait for this.
+  Completer<Result<void>> bookmarkSave = Completer();
+
+  @override
+  Future<Result<void>> safeAddBookmark({required StatRecord record}) =>
+      bookmarkSave.future;
 
   @override
   Future<Result<void>> safeUpdateCard({
@@ -213,6 +240,79 @@ void main() {
     await _settle();
     expect(loaded().statRecord.flashcardId, 'b');
     expect(fcpRepo.saved, ['a']);
+  });
+
+  test('rating while the bookmark is still saving moves on', () async {
+    await load();
+    bloc
+      ..add(SessionTestAnswerShown())
+      ..add(SessionTestBookmarkToggled());
+    await _settle();
+    expect(loaded().status, SessionTestStatus.bookmarkLoading);
+
+    bloc.add(SessionTestNextPressed(rating: Rating.hard, userStreak: _streak));
+    await _settle();
+    expect(loaded().statRecord.flashcardId, 'b');
+    expect(fcpRepo.saved, ['a']);
+
+    // The bookmark finishes later without touching the new card.
+    fcpRepo.bookmarkSave.complete(Result.ok(null));
+    await _settle();
+    expect(loaded().statRecord.flashcardId, 'b');
+    expect(loaded().statRecord.hasBookmark, isFalse);
+    expect(loaded().status, SessionTestStatus.initial);
+  });
+
+  test('a failed bookmark after moving on keeps the new card', () async {
+    await load();
+    bloc
+      ..add(SessionTestAnswerShown())
+      ..add(SessionTestBookmarkToggled());
+    await _settle();
+    bloc.add(SessionTestNextPressed(rating: Rating.good, userStreak: _streak));
+    await _settle();
+    fcpRepo.bookmarkSave.complete(Result.error(Exception('offline')));
+    await _settle();
+    expect(loaded().statRecord.flashcardId, 'b');
+  });
+
+  test('undo goes back to the last card and its progress', () async {
+    await load();
+    expect(bloc.canUndo, isFalse);
+    bloc
+      ..add(SessionTestAnswerShown())
+      ..add(SessionTestNextPressed(rating: Rating.good, userStreak: _streak));
+    await _settle();
+    bloc
+      ..add(SessionTestAnswerShown())
+      ..add(SessionTestNextPressed(rating: Rating.again, userStreak: _streak));
+    await _settle();
+    expect(loaded().statRecord.flashcardId, 'c');
+    expect(loaded().session.correctCount, 1);
+    expect(bloc.canUndo, isTrue);
+
+    bloc.add(SessionTestUndoPressed());
+    await _settle();
+    expect(loaded().statRecord.flashcardId, 'b');
+    expect(loaded().answerShown, isFalse);
+    expect(loaded().session.currentIndex, 1);
+    expect(loaded().session.correctCount, 1);
+    expect(fcpRepo.restored.single.flashcardId, 'b');
+    expect(fcpRepo.restored.single.card.reps, 0);
+    expect(sessionRepo.positions, [(1, 1)]);
+
+    bloc.add(SessionTestUndoPressed());
+    await _settle();
+    expect(loaded().statRecord.flashcardId, 'a');
+    expect(loaded().session.correctCount, 0);
+    expect(bloc.canUndo, isFalse);
+
+    // Answering again continues normally.
+    bloc
+      ..add(SessionTestAnswerShown())
+      ..add(SessionTestNextPressed(rating: Rating.easy, userStreak: _streak));
+    await _settle();
+    expect(loaded().statRecord.flashcardId, 'b');
   });
 
   test('BackgroundSaver reports failures and can wait for saves', () async {

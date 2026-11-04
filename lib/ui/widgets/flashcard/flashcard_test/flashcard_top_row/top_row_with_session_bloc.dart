@@ -8,6 +8,7 @@ import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row/widgets/bookmark_button.dart';
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row/widgets/popup_menu_button.dart';
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row/widgets/question_counter.dart';
+import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row/widgets/undo_button.dart';
 import 'package:flashcards/ui/dialogs/flashcard/share_card_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -30,7 +31,7 @@ class TopRowWithSessionBloc extends StatelessWidget {
     return BlocSelector<
       SessionTestBloc,
       SessionTestState,
-      (int, int, bool?, Flashcard, String)
+      (int, int, bool?, Flashcard, String, bool)
     >(
       selector: (state) {
         if (state is! SessionTestLoaded) {
@@ -47,6 +48,7 @@ class TopRowWithSessionBloc extends StatelessWidget {
           noFlashcard ? null : state.statRecord.hasBookmark,
           state.statRecord.flashcard!,
           state.unformattedQuestion,
+          context.read<SessionTestBloc>().canUndo,
         );
       },
       builder: (context, tuple) {
@@ -67,6 +69,13 @@ class TopRowWithSessionBloc extends StatelessWidget {
 
             Row(
               children: [
+                UndoButton(
+                  onUndo: tuple.$6
+                      ? () => context.read<SessionTestBloc>().add(
+                          SessionTestUndoPressed(),
+                        )
+                      : null,
+                ),
                 AdminEditCardButton(
                   flashcard: hasBookmark == null ? null : storedCard,
                   onEdited: (card) => context.read<SessionTestBloc>().add(

@@ -9,6 +9,7 @@ import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row/widgets/bookmark_button.dart';
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row/widgets/popup_menu_button.dart';
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row/widgets/question_counter.dart';
+import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row/widgets/undo_button.dart';
 import 'package:flashcards/ui/dialogs/flashcard/share_card_dialog.dart';
 import 'package:flashcards/ui/dialogs/flashcard/session_target_dialog.dart';
 import 'package:flutter/material.dart';
@@ -78,6 +79,13 @@ class TopRowWithFlashcardBloc extends StatelessWidget {
 
             Row(
               children: [
+                UndoButton(
+                  onUndo: context.read<FlashcardBloc>().canUndo
+                      ? () => context.read<FlashcardBloc>().add(
+                          FlashcardUndoPressed(),
+                        )
+                      : null,
+                ),
                 AdminEditCardButton(
                   flashcard: state.flashcard == null
                       ? null

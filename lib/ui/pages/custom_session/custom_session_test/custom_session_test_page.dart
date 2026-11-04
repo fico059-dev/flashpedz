@@ -156,6 +156,8 @@ class _ViewState extends State<_View> {
             child: ReviewShortcuts(
               onShowAnswer: _showAnswerFromKeyboard,
               onRate: _rateFromKeyboard,
+              onUndo: () =>
+                  context.read<SessionTestBloc>().add(SessionTestUndoPressed()),
               child: Padding(
                 padding: flashcardPagePadding,
                 child:

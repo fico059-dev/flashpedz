@@ -92,9 +92,14 @@ class _SessionRatingButtonsState extends State<_SessionRatingButtons> {
   @override
   Widget build(BuildContext context) {
     return BlocListener<SessionTestBloc, SessionTestState>(
-      // If saving failed, let the user rate again.
+      // If the rating didn't go through (saving failed, or it was ignored),
+      // let the user rate again once the app isn't busy.
       listenWhen: (previous, current) =>
-          current is SessionTestLoaded && current.status.isError,
+          current is SessionTestLoaded &&
+          (current.status.isError ||
+              (previous is SessionTestLoaded &&
+                  previous.status != current.status &&
+                  !current.status.isLoading)),
       listener: (context, state) => setState(() => _selected = null),
       child: ScoreSegmentedButton<fsrs.Rating>(
         segments: buildRatingSegments(context, widget.card),

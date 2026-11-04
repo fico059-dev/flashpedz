@@ -180,6 +180,8 @@ class _FlashcardViewState extends State<_FlashcardView> {
               child: ReviewShortcuts(
                 onShowAnswer: _showAnswerFromKeyboard,
                 onRate: _rateFromKeyboard,
+                onUndo: () =>
+                    context.read<FlashcardBloc>().add(FlashcardUndoPressed()),
                 child: LoadingOverlayListener<FlashcardBloc, FlashcardState>(
                   isLoading: (state) => state.status.isLoading,
                   child: SessionMilestoneListener(

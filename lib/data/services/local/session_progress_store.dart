@@ -83,6 +83,25 @@ class SessionProgressStore {
     }
   }
 
+  /// Takes back one counted card, when a rating is undone.
+  Future<void> remove(String uid, String packId) async {
+    final logStore = _logStore;
+    try {
+      if (logStore != null) {
+        await logStore.update((log) => log.removeSessionCard(_now(), packId));
+        return;
+      }
+      final done = await doneToday(uid, packId);
+      if (done <= 0) return;
+      await _prefs.setString(
+        _key(uid, packId),
+        '${dayKey(_now())}|${done - 1}',
+      );
+    } catch (_) {
+      // Only the session counter is off by one.
+    }
+  }
+
   /// Sends this device's counts online now, e.g. when a session closes.
   Future<void> flush() async {
     try {

@@ -41,6 +41,7 @@ class SessionTestBloc extends Bloc<SessionTestEvent, SessionTestState> {
     on<SessionTestBookmarkToggled>(_onBookmarkToggled);
     on<SessionTestAnswerShown>(_onAnswerShown);
     on<SessionTestCardEdited>(_onCardEdited);
+    on<SessionTestUndoPressed>(_onUndoPressed);
     on<SessionTestStreakChanged>((event, emit) {
       final state = this.state;
       if (state is SessionTestLoaded) {
@@ -273,9 +274,9 @@ class SessionTestBloc extends Bloc<SessionTestEvent, SessionTestState> {
     Emitter<SessionTestState> emit,
   ) async {
     final state = this.state;
-    if (state is! SessionTestLoaded ||
-        state.status.isLoading ||
-        state.status.isBookmarkLoading) {
+    // A bookmark still being saved doesn't hold up rating: it finishes in
+    // the background.
+    if (state is! SessionTestLoaded || state.status.isLoading) {
       return;
     }
     // Ratings are only offered once the answer is shown, so a stray second
@@ -307,7 +308,16 @@ class SessionTestBloc extends Bloc<SessionTestEvent, SessionTestState> {
       }
     }
 
-    _saveAnswer(state, event);
+    final undo = _SessionUndo(
+      state.copyWith(
+        status: SessionTestStatus.initial,
+        answerShown: false,
+        error: null,
+      ),
+      rated: event.rating != null && !state.status.isNoFlashcard,
+    );
+    _undoStack.add(undo);
+    _saveAnswer(state, event, undo);
 
     final newSession = event.isCorrect
         ? state.session.incrementCurrentIndexAndCorrectCount()
@@ -354,7 +364,11 @@ class SessionTestBloc extends Bloc<SessionTestEvent, SessionTestState> {
   }
 
   /// Saves the rating, the session position and the streak in the background.
-  void _saveAnswer(SessionTestLoaded state, SessionTestNextPressed event) {
+  void _saveAnswer(
+    SessionTestLoaded state,
+    SessionTestNextPressed event,
+    _SessionUndo undo,
+  ) {
     _updateStreakInBackground(
       () => _profileRepo.checkAndIncrementCardsCount(event.userStreak),
     );
@@ -381,7 +395,7 @@ class SessionTestBloc extends Bloc<SessionTestEvent, SessionTestState> {
           rating: rating,
         ),
       );
-      _countTowardsTargets(currRecord.packId);
+      _countTowardsTargets(currRecord.packId, undo);
     }
 
     final sessionId = state.session.id;
@@ -395,19 +409,67 @@ class SessionTestBloc extends Bloc<SessionTestEvent, SessionTestState> {
 
   /// A card studied here counts towards today's session of its pack (and
   /// the exam goal's), like a card studied in the pack itself.
-  void _countTowardsTargets(String packId) {
+  void _countTowardsTargets(String packId, _SessionUndo undo) {
     final progress = _sessionProgress;
     if (progress == null || packId.isEmpty) return;
+    undo.countedKeys.add(packId);
     unawaited(() async {
       await progress.add('', packId);
       try {
         if (await _dailyTarget?.isGoalPack([packId]) ?? false) {
+          undo.countedKeys.add('goal');
           await progress.add('', 'goal');
         }
       } catch (_) {
         // Only the goal's session count is missed.
       }
     }());
+  }
+
+  /// The answered cards, newest last, so answers can be undone.
+  final _undoStack = <_SessionUndo>[];
+
+  /// Whether there is an answer to undo.
+  bool get canUndo {
+    final state = this.state;
+    return _undoStack.isNotEmpty &&
+        state is SessionTestLoaded &&
+        !state.status.isLoading &&
+        !state.status.isFinished;
+  }
+
+  Future<void> _onUndoPressed(
+    SessionTestUndoPressed event,
+    Emitter<SessionTestState> emit,
+  ) async {
+    if (_advancing || !canUndo) return;
+    final undo = _undoStack.removeLast();
+    final previous = undo.state;
+    final session = previous.session;
+
+    if (undo.rated) {
+      final before = previous.statRecord.copyWith(
+        flashcard: previous.statRecord.flashcard?.copyWith(
+          question: previous.unformattedQuestion,
+        ),
+      );
+      _saver.run('undo', () => _fcpRepo.restoreCard(before: before));
+    }
+    _saver.run(
+      'session position',
+      () => _sessionRepo.setSessionProgress(
+        session.id,
+        currentIndex: session.currentIndex,
+        correctCount: session.correctCount,
+      ),
+    );
+    final progress = _sessionProgress;
+    if (progress != null) {
+      for (final key in undo.countedKeys) {
+        unawaited(progress.remove('', key));
+      }
+    }
+    emit(previous);
   }
 
   void _onBookmarkToggled(
@@ -452,10 +514,13 @@ class SessionTestBloc extends Bloc<SessionTestEvent, SessionTestState> {
         print(error);
         // when we write this.state it's referring to the global state, not local one
         // so here we just return back the old local stat record
+        final now = this.state as SessionTestLoaded;
+        // The student may have rated the card and moved on meanwhile.
+        final sameCard = now.statRecord.flashcardId == currRecord.flashcardId;
         emit(
-          (this.state as SessionTestLoaded).copyWith(
+          now.copyWith(
             status: SessionTestStatus.error,
-            statRecord: currRecord,
+            statRecord: sameCard ? currRecord : now.statRecord,
             error: error,
           ),
         );
@@ -463,10 +528,22 @@ class SessionTestBloc extends Bloc<SessionTestEvent, SessionTestState> {
       case Ok<void>():
     }
 
-    emit(
-      (this.state as SessionTestLoaded).copyWith(
-        status: SessionTestStatus.initial,
-      ),
-    );
+    final now = this.state as SessionTestLoaded;
+    if (now.status.isBookmarkLoading) {
+      emit(now.copyWith(status: SessionTestStatus.initial));
+    }
   }
+}
+
+/// How the session was before an answer, to undo it.
+class _SessionUndo {
+  final SessionTestLoaded state;
+
+  /// The answer was a rating saved to the card's progress.
+  final bool rated;
+
+  /// Today's session counters the answer was counted in.
+  final countedKeys = <String>[];
+
+  _SessionUndo(this.state, {required this.rated});
 }

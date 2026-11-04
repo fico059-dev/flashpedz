@@ -143,6 +143,7 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
     on<FlashcardCardsPerSessionUpdated>(_onFlashcardCardsPerSessionUpdated);
     on<FlashcardRatingGiven>(_onFlashcardRatingGiven);
     on<FlashcardBookmarkToggled>(_onFlashcardBookmarkToggled);
+    on<FlashcardUndoPressed>(_onUndoPressed);
     on<FlashcardIgnored>(_onFlashcardIgnored);
     on<FlashcardTutorialSeenChecked>(_onTutorialChecked);
     on<FlashcardTutorialFinished>(_onTutorialFinished);
@@ -262,7 +263,8 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
       return;
     }
 
-    final currStatRecord = state.statRecords[state.currentCardIndex];
+    final index = state.currentCardIndex;
+    final currStatRecord = state.statRecords[index];
     final updatedRecords = _updateCurrentStatRecord(
       (record) => record.copyWith(hasBookmark: !currStatRecord.hasBookmark),
     );
@@ -286,10 +288,16 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
 
     switch (bookmarkResult) {
       case Error<void>(:final error):
-        // revert previous state and emit error
-        final revert = _updateCurrentStatRecord(
-          (record) => record.copyWith(hasBookmark: currStatRecord.hasBookmark),
-        );
+        // Undo the change on that card (the student may have rated it and
+        // moved on meanwhile).
+        final revert = index < state.statRecords.length
+            ? _updateStatRecordAt(
+                state.statRecords,
+                index,
+                (record) =>
+                    record.copyWith(hasBookmark: currStatRecord.hasBookmark),
+              )
+            : state.statRecords;
         emit(
           state.copyWith(
             status: FlashcardStatus.error,
@@ -303,12 +311,63 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
 
     //_updateCacheForBookmark(currStatRecord);
 
-    emit(state.copyWith(status: FlashcardStatus.loaded));
+    // Rating meanwhile has already moved on to the next card.
+    if (state.status.isBookmarkLoading) {
+      emit(state.copyWith(status: FlashcardStatus.loaded));
+    }
   }
 
   /// True while moving to the next card, so a quick double tap doesn't
   /// rate the same card twice.
   bool _advancing = false;
+
+  /// The cards rated in this batch, newest last, so ratings can be undone.
+  final _undoStack = <_RatedCard>[];
+
+  /// Whether there is a rating to undo.
+  bool get canUndo =>
+      _undoStack.isNotEmpty &&
+      _undoStack.last.batch == state.currentBatch &&
+      !state.status.isLoading;
+
+  Future<void> _onUndoPressed(
+    FlashcardUndoPressed event,
+    Emitter<FlashcardState> emit,
+  ) async {
+    if (_advancing ||
+        !canUndo ||
+        state.status.isSessionEnded ||
+        state.status.isPackFinished) {
+      return;
+    }
+    final last = _undoStack.removeLast();
+    final before = last.before;
+    final flashcard = before.flashcard;
+    if (flashcard == null || last.index >= state.statRecords.length) return;
+
+    _saver.run('undo', () => _fcpRepo.restoreCard(before: before));
+    if (last.countedKey != null) {
+      unawaited(_sessionProgress.remove(_uid, last.countedKey!));
+    }
+
+    emit(
+      state.copyWith(
+        status: FlashcardStatus.loaded,
+        flashcard: flashcard.copyWith(
+          question: redactClozeQuestion(flashcard.question),
+        ),
+        currentCardIndex: last.index,
+        statRecords: _updateStatRecordAt(
+          state.statRecords,
+          last.index,
+          (_) => before,
+        ),
+        answerVisible: false,
+        hintVisible: false,
+        errorMessage: null,
+      ),
+    );
+  }
 
   void _onFlashcardRatingGiven(
     FlashcardRatingGiven event,
@@ -327,10 +386,11 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
     FlashcardRatingGiven event,
     Emitter<FlashcardState> emit,
   ) async {
+    // A bookmark still being saved doesn't hold up rating: it finishes in
+    // the background.
     if (state.status.isSessionEnded ||
         state.status.isPackFinished ||
-        state.status.isLoading ||
-        state.status.isBookmarkLoading) {
+        state.status.isLoading) {
       return;
     }
 
@@ -353,11 +413,21 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
     });
 
     // Counts towards today's target of this pack (not extra batches).
+    String? countedKey;
     if (state.testType == TestType.regular &&
         state.currentBatch == 0 &&
         state.pack != null) {
-      _sessionProgress.add(_uid, _progressKey ?? state.pack!.id);
+      countedKey = _progressKey ?? state.pack!.id;
+      _sessionProgress.add(_uid, countedKey);
     }
+    _undoStack.add(
+      _RatedCard(
+        index: state.currentCardIndex,
+        batch: state.currentBatch,
+        before: state.statRecords[state.currentCardIndex],
+        countedKey: countedKey,
+      ),
+    );
 
     final oldCard = state.statRecords[state.currentCardIndex].card;
     final newCard = FSRS().repeat(oldCard, DateTime.now())[event.rating]!.card;
@@ -414,6 +484,7 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
     await _sessionProgress.setPackTarget(_uid, pack.id, event.target);
     // Ratings already given are saved; start again with the new target.
     await _saver.settle();
+    _undoStack.clear();
     emit(FlashcardState());
     add(start);
   }
@@ -751,6 +822,8 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
     }
 
     emit(state.copyWith(status: FlashcardStatus.loading, errorMessage: null));
+    // The previous batch's cards are gone from the screen.
+    _undoStack.clear();
 
     final int cardsPerSession = newCardsPerSession ?? state.cardsPerSession!;
     Result<List<StatRecord>> testResult;
@@ -843,6 +916,23 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
     final now = DateTime.now();
     return due.year == now.year && due.month == now.month && due.day == now.day;
   }
+}
+
+/// A rated card as it was before the rating, to undo it.
+class _RatedCard {
+  final int index;
+  final int batch;
+  final StatRecord before;
+
+  /// The session counter the rating was counted in, if any.
+  final String? countedKey;
+
+  const _RatedCard({
+    required this.index,
+    required this.batch,
+    required this.before,
+    this.countedKey,
+  });
 }
 
 class GetNewFlashcard {

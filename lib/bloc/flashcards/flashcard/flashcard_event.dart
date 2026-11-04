@@ -54,6 +54,9 @@ class FlashcardRatingGiven extends FlashcardEvent {
 
 class FlashcardBookmarkToggled extends FlashcardEvent {}
 
+/// Takes back the last rating and shows that card again.
+class FlashcardUndoPressed extends FlashcardEvent {}
+
 class FlashcardIgnored extends FlashcardEvent {}
 
 class FlashcardCardsPerSessionUpdated extends FlashcardEvent {

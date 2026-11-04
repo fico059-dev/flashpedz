@@ -355,6 +355,16 @@ class StudyLog {
     return copyWith(sessions: _recent({...sessions, day: today}, now));
   }
 
+  /// Takes back one studied card (the student undid a rating).
+  StudyLog removeSessionCard(DateTime now, String key) {
+    final day = dayKey(now);
+    final today = {...?sessions[day]};
+    final done = today[key] ?? 0;
+    if (done <= 0) return this;
+    today[key] = done - 1;
+    return copyWith(sessions: {...sessions, day: today});
+  }
+
   /// The session target chosen for [packId], or null for the default.
   int? packTarget(String packId) {
     final target = packTargets[packId]?.$1 ?? 0;
