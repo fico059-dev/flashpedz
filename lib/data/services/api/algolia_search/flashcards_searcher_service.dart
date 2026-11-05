@@ -8,8 +8,16 @@ import 'package:flashcards/utils/result.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// The searchable cards and the version they belong to.
-typedef SearchCards = ({String version, List<AlgoliaFlashcard> cards});
+/// A card's question and answer pictures.
+typedef CardImages = ({String? question, String? answer});
+
+/// The searchable cards, the version they belong to, and the pictures of
+/// the cards that have any.
+typedef SearchCards = ({
+  String version,
+  List<AlgoliaFlashcard> cards,
+  Map<String, CardImages> images,
+});
 
 /// Loads the flashcards that flashcard search runs over. Search used to go
 /// through Algolia, whose app no longer exists, so flashcards are read from
@@ -47,7 +55,8 @@ class FlashcardsSearcherService {
         version: version,
       );
       if (download == null) return Result.ok(null);
-      final cards = decodeSearchCards(download.gzip);
+      final images = <String, CardImages>{};
+      final cards = decodeSearchCards(download.gzip, images: images);
       final key = _key;
       if (key != null && download.gzip.length < _maxSavedLength) {
         try {
@@ -56,7 +65,11 @@ class FlashcardsSearcherService {
           // Downloaded again next time.
         }
       }
-      return Result.ok((version: download.version, cards: cards));
+      return Result.ok((
+        version: download.version,
+        cards: cards,
+        images: images,
+      ));
     } on Exception catch (error) {
       return Result.error(error);
     } catch (error) {
@@ -84,9 +97,11 @@ class FlashcardsSearcherService {
       if (saved == null) return null;
       final split = saved.indexOf('\n');
       if (split <= 0) return null;
+      final images = <String, CardImages>{};
       return (
         version: saved.substring(0, split),
-        cards: decodeSearchCards(saved.substring(split + 1)),
+        cards: decodeSearchCards(saved.substring(split + 1), images: images),
+        images: images,
       );
     } catch (_) {
       return null;
@@ -95,11 +110,24 @@ class FlashcardsSearcherService {
 }
 
 /// Unpacks the gzipped (base64) card list sent by the server, sorted by
-/// question.
-List<AlgoliaFlashcard> decodeSearchCards(String gzipBase64) {
+/// question. The cards' pictures are put in [images].
+List<AlgoliaFlashcard> decodeSearchCards(
+  String gzipBase64, {
+  Map<String, CardImages>? images,
+}) {
   final json = utf8.decode(GZipDecoder().decodeBytes(base64Decode(gzipBase64)));
+  final list = jsonDecode(json) as List<dynamic>;
+  if (images != null) {
+    for (final data in list) {
+      final question = data['questionImageUrl'] as String?;
+      final answer = data['answerImageUrl'] as String?;
+      if (question != null || answer != null) {
+        images[data['id'] as String] = (question: question, answer: answer);
+      }
+    }
+  }
   final cards = [
-    for (final data in jsonDecode(json) as List<dynamic>)
+    for (final data in list)
       AlgoliaFlashcard(
         objectID: data['id'] as String,
         question: data['question'] as String? ?? '',

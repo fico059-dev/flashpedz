@@ -77,11 +77,23 @@ class _MySetsSectionState extends State<MySetsSection> {
         else
           for (final set in repo.sets) _SetTile(set: set),
         const SizedBox(height: 20),
-        Text(
-          'Examine Yourself',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Examine Yourself',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () =>
+                  context.router.push(const CustomSessionWrapperRoute()),
+              icon: const Icon(Icons.add),
+              label: const Text('New exam'),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
       ],

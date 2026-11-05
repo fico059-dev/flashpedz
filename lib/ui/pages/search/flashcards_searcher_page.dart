@@ -26,6 +26,7 @@ class FlashcardsSearcherPage extends StatelessWidget {
       final result = await showFcReviewBottomSheet(
         context: context,
         flashcardId: flashcard.objectID,
+        packId: flashcard.packId,
         question: flashcard.question,
         answer: flashcard.answer,
         isPaid: flashcard.isPaid,
@@ -40,11 +41,10 @@ class FlashcardsSearcherPage extends StatelessWidget {
     }
 
     return BlocProvider(
-      create:
-          (context) => FlashcardsSearcherBloc(
-            flashcardsSearcherRepository:
-                context.read<FlashcardsSearcherRepository>(),
-          ),
+      create: (context) => FlashcardsSearcherBloc(
+        flashcardsSearcherRepository: context
+            .read<FlashcardsSearcherRepository>(),
+      ),
       child: _View(onTap: onTap, searchBarAsTitle: true, title: null),
     );
   }
@@ -79,12 +79,11 @@ class _ViewState extends State<_View> {
     return SearchPage(
       searchBar: FlashcardsSearchBar(cont: _queryCont),
       searchResults: FlashcardsSearchResults(
-        onTap:
-            (flashcard, hasCards) => widget.onTap!(
-              flashcard,
-              hasCards,
-              context.read<FlashcardsSearcherBloc>(),
-            ),
+        onTap: (flashcard, hasCards) => widget.onTap!(
+          flashcard,
+          hasCards,
+          context.read<FlashcardsSearcherBloc>(),
+        ),
       ),
       filterOptions: FlashcardsFilterOptions(),
       itemCount: FlashcardsItemCount(),

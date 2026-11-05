@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flashcards/data/remote/cloud_function_service.dart';
+import 'package:flashcards/data/repositories/algolia_search/flashcards_searcher_repository.dart';
 import 'package:flashcards/data/repositories/card_sets/card_set_repository.dart';
 import 'package:flashcards/data/repositories/flashcards/flashcard_repository.dart';
 import 'package:flashcards/data/services/api/users/auth_service.dart';
@@ -69,8 +70,9 @@ class _Functions implements CloudFunctionService {
       failNext = false;
       throw Exception('offline');
     }
-    final ids = sets.firstWhere((s) => s['id'] == setId)['flashcardIds']
-        as List<String>;
+    final ids =
+        sets.firstWhere((s) => s['id'] == setId)['flashcardIds']
+            as List<String>;
     inSet ? ids.add(flashcardId) : ids.remove(flashcardId);
   }
 
@@ -79,8 +81,13 @@ class _Functions implements CloudFunctionService {
 }
 
 class _Cards implements FlashcardRepository {
+  final asked = <String>[];
   @override
   Future<List<Flashcard>> getFlashcardsByIds(List<String> ids) async => [
+    ...?(() {
+      asked.addAll(ids);
+      return null;
+    })(),
     for (final id in ids)
       Flashcard(
         id: id,
@@ -180,6 +187,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('My Sets (1/5)'), findsOneWidget);
+    expect(find.text('New exam'), findsOneWidget);
     expect(find.text('Cardio weak'), findsOneWidget);
     expect(find.text('2 cards'), findsOneWidget);
     expect(find.byTooltip('Study'), findsOneWidget);
@@ -229,4 +237,46 @@ void main() {
     await tester.pumpAndSettle();
     expect(deleted, isTrue);
   });
+
+  testWidgets('cards in the search list are not read again', (tester) async {
+    final cards = _Cards();
+    final search = _Search();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<FlashcardRepository>.value(value: cards),
+          Provider<FlashcardsSearcherRepository?>.value(value: search),
+          ChangeNotifierProvider.value(value: repo),
+        ],
+        child: MaterialApp(
+          home: CardBrowserPage(
+            title: 'Exam',
+            loadIds: () async => ['c1', 'own', 'c2'],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('From list c1'), findsOneWidget);
+    expect(find.text('Question own'), findsOneWidget);
+    expect(cards.asked, ['own']);
+  });
+}
+
+class _Search implements FlashcardsSearcherRepository {
+  @override
+  Future<List<Flashcard>> cardsByIds(Iterable<String> ids) async => [
+    for (final id in ids)
+      if (id != 'own')
+        Flashcard(
+          id: id,
+          packId: 'p',
+          question: 'From list $id',
+          answer: 'A',
+          tags: const [],
+        ),
+  ];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

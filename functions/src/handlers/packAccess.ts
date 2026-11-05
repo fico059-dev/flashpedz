@@ -160,6 +160,9 @@ type SearchCard = {
   isPaid: boolean;
   tags: string[];
   packId: string;
+  /** Only when the card has one, to keep the list small. */
+  questionImageUrl?: string;
+  answerImageUrl?: string;
 };
 
 /** Cards and packs are read again after this long (ms). */
@@ -183,7 +186,15 @@ async function searchData() {
   const [packs, cards] = await Promise.all([
     db.collection("packs").get(),
     db.collection("flashcards")
-      .select("question", "answer", "isPaid", "tags", "packId")
+      .select(
+        "question",
+        "answer",
+        "isPaid",
+        "tags",
+        "packId",
+        "questionImageUrl",
+        "answerImageUrl",
+      )
       .get(),
   ]);
   searchCache = {
@@ -198,6 +209,9 @@ async function searchData() {
         isPaid: data.isPaid === true,
         tags: Array.isArray(data.tags) ? data.tags : [],
         packId: data.packId ?? "",
+        ...(data.questionImageUrl ?
+          {questionImageUrl: data.questionImageUrl} : {}),
+        ...(data.answerImageUrl ? {answerImageUrl: data.answerImageUrl} : {}),
       };
     }),
   };
@@ -237,7 +251,9 @@ export async function listSearchableFlashcardsHandler(
     if (request.data?.compressed !== true) return {flashcards: result};
 
     const json = JSON.stringify(result);
-    const version = createHash("sha1").update(json).digest("hex");
+    // "img-": the list has the cards' pictures, so the app can show cards
+    // from it without reading each one.
+    const version = "img-" + createHash("sha1").update(json).digest("hex");
     if (request.data?.version === version) return {unchanged: true, version};
     return {
       version,

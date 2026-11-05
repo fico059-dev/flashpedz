@@ -1,3 +1,5 @@
+import 'package:flashcards/data/repositories/algolia_search/flashcards_searcher_repository.dart';
+import 'package:flashcards/data/repositories/flashcards/fast_cards.dart';
 import 'package:flashcards/data/repositories/flashcards/flashcard_repository.dart';
 import 'package:flashcards/data/repositories/flashcards/pack_repository.dart';
 import 'package:flashcards/data/services/local/pdf_export_service.dart';
@@ -68,6 +70,7 @@ Future<void> showExportHighlightsSheet(
     builder: (_) => MultiProvider(
       providers: [
         Provider.value(value: context.read<FlashcardRepository>()),
+        Provider.value(value: context.read<FlashcardsSearcherRepository?>()),
         Provider.value(value: context.read<PackRepository>()),
       ],
       child: ExportHighlightsSheet(highlights: highlights),
@@ -115,23 +118,22 @@ class _ExportHighlightsSheetState extends State<ExportHighlightsSheet> {
 
   Future<void> _load() async {
     final cardIds = _marks.map((h) => h.flashcardId).toSet().toList();
-    final cards = await context.read<FlashcardRepository>().getFlashcardsByIds(
-      cardIds,
-    );
-    final packIds = {
-      ..._marks.map((h) => h.packId),
-      ...cards.map((c) => c.packId),
-    };
-    if (!mounted) return;
     final packRepo = context.read<PackRepository>();
-    await Future.wait(
-      packIds.map((id) async {
-        final result = await packRepo.getPack(id);
-        if (result case Ok<SimplePack>(:final value)) {
-          _packNames[id] = value.packName;
-        }
-      }),
-    );
+    Future<void> name(String id) async {
+      if (_packNames.containsKey(id)) return;
+      final result = await packRepo.getPack(id);
+      if (result case Ok<SimplePack>(:final value)) {
+        _packNames[id] = value.packName;
+      }
+    }
+
+    // The pack names and the cards at the same time.
+    final naming = Future.wait(_marks.map((h) => h.packId).toSet().map(name));
+    final cards = await loadCardsFast(context, cardIds);
+    await Future.wait([
+      naming,
+      ...cards.map((c) => c.packId).toSet().map(name),
+    ]);
     if (!mounted) return;
     setState(() => _cards = {for (final card in cards) card.id: card});
   }
@@ -187,7 +189,15 @@ class _ExportHighlightsSheetState extends State<ExportHighlightsSheet> {
     String label,
     List<HighlightPdfSection> sections,
   ) async {
-    final service = await PdfExportService.create();
+    final service = await PdfExportService.create(
+      text: [
+        for (final section in sections)
+          for (final card in section.cards) ...[
+            card.question,
+            ...card.passages,
+          ],
+      ].join('\n'),
+    );
     final bytes = await service.generateHighlightsPdf(
       filterLabel: label,
       sections: sections,

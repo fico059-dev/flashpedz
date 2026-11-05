@@ -24,6 +24,7 @@ class FcReviewGetterCubit extends Cubit<FcReviewGetterState> {
     required String answer,
     required bool isPaid,
     required bool hasCards,
+    String? packId,
   }) async {
     if (state is! FcReviewGetterInitial) return;
 
@@ -34,7 +35,10 @@ class FcReviewGetterCubit extends Cubit<FcReviewGetterState> {
 
     emit(FcReviewGetterLoading());
 
-    final result = await _fcRepo.getFlashcardReview(flashcardId);
+    final result = await _fcRepo.getFlashcardReview(
+      flashcardId,
+      packId: packId,
+    );
     switch (result) {
       case Error<FlashcardReview>(:final error):
         emit(FcReviewGetterError(error: error));

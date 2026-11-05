@@ -6,6 +6,7 @@ import 'package:flashcards/domain/models/osce/question/check/check.dart';
 import 'package:flashcards/domain/models/osce/question/question.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:printing/printing.dart';
 
 class PdfExportService {
@@ -20,25 +21,41 @@ class PdfExportService {
   }) : _theme = theme,
        _loadImage = loadImage ?? _networkImageOrNull;
 
-  /// Uses Open Sans (with an Arabic fallback) and falls back to the built-in
-  /// PDF font when there is no internet for the fonts.
-  static Future<PdfExportService> create() async {
+  static pw.Font? _regular;
+  static pw.Font? _bold;
+  static pw.Font? _arabic;
+  static final _arabicLetters = RegExp(r'[\u0600-\u06FF\u0750-\u077F]');
+
+  /// Uses the Roboto font built into the app (no download, so it is quick).
+  /// Only when [text] has Arabic is an Arabic font downloaded (once). Falls
+  /// back to the built-in PDF font if the fonts can't be loaded.
+  static Future<PdfExportService> create({String? text}) async {
     try {
-      final fonts = await Future.wait([
-        PdfGoogleFonts.openSansRegular(),
-        PdfGoogleFonts.openSansBold(),
-        PdfGoogleFonts.notoSansArabicRegular(),
-      ]).timeout(const Duration(seconds: 15));
-      return PdfExportService(
-        theme: pw.ThemeData.withFont(
-          base: fonts[0],
-          bold: fonts[1],
-          fontFallback: [fonts[2]],
-        ),
+      _regular ??= pw.Font.ttf(
+        await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
+      );
+      _bold ??= pw.Font.ttf(
+        await rootBundle.load('assets/fonts/Roboto-Bold.ttf'),
       );
     } catch (_) {
       return PdfExportService(theme: pw.ThemeData.base());
     }
+    if (_arabic == null && (text == null || _arabicLetters.hasMatch(text))) {
+      try {
+        _arabic = await PdfGoogleFonts.notoSansArabicRegular().timeout(
+          const Duration(seconds: 8),
+        );
+      } catch (_) {
+        // Without Arabic letters.
+      }
+    }
+    return PdfExportService(
+      theme: pw.ThemeData.withFont(
+        base: _regular,
+        bold: _bold,
+        fontFallback: [?_arabic],
+      ),
+    );
   }
 
   static Future<pw.ImageProvider?> _networkImageOrNull(String url) async {

@@ -91,6 +91,7 @@ class _ViewState extends State<_View> {
         onTap: (flashcard, hasCards) => showFcReviewBottomSheet(
           context: context,
           flashcardId: flashcard.objectID,
+          packId: flashcard.packId,
           question: flashcard.question,
           answer: flashcard.answer,
           isPaid: flashcard.isPaid,

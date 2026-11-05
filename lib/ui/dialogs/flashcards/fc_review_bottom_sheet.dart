@@ -16,7 +16,6 @@ import 'package:flashcards/ui/widgets/core/tag_chip.dart';
 import 'package:flashcards/ui/widgets/fc_review_bottom_sheet/fc_review_sheet_admin_floating_button.dart';
 import 'package:flashcards/ui/widgets/fc_review_bottom_sheet/fc_review_sheet_header.dart';
 import 'package:flashcards/ui/widgets/fc_review_bottom_sheet/fc_review_sheet_user_floating_button.dart';
-import 'package:flashcards/ui/widgets/fc_review_bottom_sheet/fc_review_shimmer.dart';
 import 'package:flashcards/ui/widgets/flashcard/fsrs_card_items/card_meta_chip_enhanced.dart';
 import 'package:flashcards/utils/firebase_error_mapper.dart';
 import 'package:flashcards/utils/util_functions.dart';
@@ -31,6 +30,7 @@ Future<bool?> showFcReviewBottomSheet({
   required String answer,
   required bool isPaid,
   required bool hasCards,
+  String? packId,
 }) async {
   return await showModalBottomSheet(
     context: context,
@@ -53,6 +53,7 @@ Future<bool?> showFcReviewBottomSheet({
               answer: answer,
               question: question,
               flashcardId: flashcardId,
+              packId: packId,
               scrollController: scrollController,
             ),
           );
@@ -68,10 +69,12 @@ class _FlashcardBottomSheet extends StatefulWidget {
   final String answer;
   final bool isPaid;
   final bool hasCards;
+  final String? packId;
   final ScrollController scrollController;
 
   const _FlashcardBottomSheet({
     super.key,
+    this.packId,
     required this.scrollController,
     required this.flashcardId,
     required this.question,
@@ -92,8 +95,9 @@ class _FlashcardBottomSheetState extends State<_FlashcardBottomSheet> {
       isPaid: widget.isPaid,
       hasCards: widget.hasCards,
       answer: widget.answer,
-      question: widget.answer,
+      question: widget.question,
       flashcardId: widget.flashcardId,
+      packId: widget.packId,
     );
   }
 
@@ -125,9 +129,29 @@ class _FlashcardBottomSheetState extends State<_FlashcardBottomSheet> {
               switch (state) {
                 case FcReviewGetterInitial():
                 case FcReviewGetterLoading():
+                  // The question and answer are known already: shown
+                  // straight away while the rest loads.
                   return Padding(
                     padding: bottomSheetHorizontalPadding,
-                    child: FcReviewShimmer(),
+                    child: ListView(
+                      controller: widget.scrollController,
+                      children: [
+                        _buildFlashcardItem(
+                          icon: Icons.help_outline,
+                          iconColor: context.colors.primary,
+                          label: widget.question,
+                          context: context,
+                        ),
+                        _buildFlashcardItem(
+                          icon: Icons.lightbulb_outline,
+                          iconColor: context.colors.tertiary,
+                          label: widget.answer,
+                          context: context,
+                        ),
+                        const SizedBox(height: 8),
+                        const LinearProgressIndicator(),
+                      ],
+                    ),
                   );
                 case FcReviewGetterError(:final error):
                   return ErrorScreen(

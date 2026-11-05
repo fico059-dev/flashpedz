@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -164,8 +165,7 @@ class ImportImagePlan {
       final hasUrl = url?.isNotEmpty ?? false;
       if (image != null) {
         // New picture, or the deck now uses different images.
-        final upload =
-            !hasUrl || (knownKey != null && knownKey != image.key);
+        final upload = !hasUrl || (knownKey != null && knownKey != image.key);
         return (upload, false);
       }
       // Removed in the deck: only remove images that came from it.
@@ -227,7 +227,75 @@ class FlashcardRepository {
        _fcpService = fcpService,
        _packsCache = packCache;
 
-  Future<Result<FlashcardReview>> getFlashcardReview(String flashcardId) async {
+  /// Packs read for previews, kept a few minutes (their name and size
+  /// rarely change), so previewing more cards is quicker.
+  final _previewPacks = <String, (DateTime, PackDto)>{};
+
+  Future<Result<PackDto>> _previewPack(String packId) async {
+    final kept = _previewPacks[packId];
+    if (kept != null &&
+        DateTime.now().difference(kept.$1) < const Duration(minutes: 5)) {
+      return Result.ok(kept.$2);
+    }
+    final result = await _packService.getDocument(packId);
+    if (result case Ok<PackDto>(:final value)) {
+      _previewPacks[packId] = (DateTime.now(), value);
+    }
+    return result;
+  }
+
+  /// The card with the student's progress and its pack, for the preview.
+  /// With [packId] (known from the search list) everything is read at
+  /// once instead of one after another.
+  Future<Result<FlashcardReview>> getFlashcardReview(
+    String flashcardId, {
+    String? packId,
+  }) async {
+    if (packId != null && packId.isNotEmpty) {
+      final reads = await Future.wait<Object>([
+        _fcpService.getFcpDataDocument(
+          profileId: _getUid(),
+          flashcardId: flashcardId,
+        ),
+        _previewPack(packId),
+        _flashcardService.getDocument(flashcardId),
+      ]);
+      final fcp = reads[0] as Result<FcpDataDto>;
+      final packRead = reads[1] as Result<PackDto>;
+      final cardRead = reads[2] as Result<FlashcardDto>;
+      if (fcp case Error<FcpDataDto>(
+        :final error,
+      ) when error is! DocumentDoesntExistException) {
+        return Result.error(error);
+      }
+      if (packRead case Error<PackDto>(:final error)) {
+        return Result.error(error);
+      }
+      final pack = (packRead as Ok<PackDto>).value.toAdminPackDomain();
+      final StatRecord record;
+      if (fcp case Ok<FcpDataDto>(:final value)) {
+        record = value.toStatRecordDomain();
+      } else {
+        if (cardRead case Error<FlashcardDto>(:final error)) {
+          return Result.error(error);
+        }
+        record = StatRecord(
+          isPaid: pack.isPaid,
+          packId: pack.packId,
+          flashcardId: flashcardId,
+          card: Card(),
+          flashcard: (cardRead as Ok<FlashcardDto>).value.toDomain(),
+        );
+      }
+      return Result.ok(
+        FlashcardReview(
+          packName: pack.packName,
+          packFlashcardsCount: pack.flashcardsCount,
+          record: record,
+        ),
+      );
+    }
+
     final fcpResult = await _fcpService.getFcpDataDocument(
       profileId: _getUid(),
       flashcardId: flashcardId,
@@ -264,7 +332,7 @@ class FlashcardRepository {
         // if the fcpData doc is found, it means we have fsrsData and fcSnapshot doc
         // then we only need to fetch the pack data.
         final record = value.toStatRecordDomain();
-        final result = await _packService.getDocument(record.packId);
+        final result = await _previewPack(record.packId);
         switch (result) {
           case Error<PackDto>(:final error):
             return Result.error(error);
@@ -365,18 +433,18 @@ class FlashcardRepository {
   /// The cards with these ids, in the same order. Deleted cards (and ones
   /// the student can't open) are left out.
   Future<List<Flashcard>> getFlashcardsByIds(List<String> ids) async {
-    final results = <Flashcard?>[];
-    const parallel = 10;
-    for (var i = 0; i < ids.length; i += parallel) {
-      results.addAll(
-        await Future.wait(
-          ids.skip(i).take(parallel).map((id) async {
-            final result = await getFlashcard(id);
-            return result is Ok<Flashcard> ? result.value : null;
-          }),
-        ),
-      );
+    // Up to 25 reads at a time, a new one starting as soon as one ends.
+    final results = List<Flashcard?>.filled(ids.length, null);
+    var next = 0;
+    Future<void> worker() async {
+      while (next < ids.length) {
+        final i = next++;
+        final result = await getFlashcard(ids[i]);
+        if (result is Ok<Flashcard>) results[i] = result.value;
+      }
     }
+
+    await Future.wait(List.generate(min(25, ids.length), (_) => worker()));
     return results.nonNulls.toList();
   }
 

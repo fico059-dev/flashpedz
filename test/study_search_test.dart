@@ -46,7 +46,7 @@ class _Service implements FlashcardsSearcherService {
     if (offline) return Result.error(Exception('No connection'));
     if (version == 'v1') return Result.ok(null);
     downloads++;
-    return Result.ok((version: 'v1', cards: _cards));
+    return Result.ok((version: 'v1', cards: _cards, images: const {}));
   }
 
   @override
@@ -85,7 +85,11 @@ void main() {
     'saved cards are searched at once and only re-downloaded when changed',
     () async {
       final service = _Service()
-        ..saved = (version: 'v1', cards: _cards.take(1).toList())
+        ..saved = (
+          version: 'v1',
+          cards: _cards.take(1).toList(),
+          images: const {},
+        )
         ..offline = true;
       final repo = FlashcardsSearcherRepository(
         flashcardsSearcherService: service,
@@ -103,7 +107,7 @@ void main() {
       service.offline = false;
       final fresh = FlashcardsSearcherRepository(
         flashcardsSearcherService: service
-          ..saved = (version: 'v1', cards: _cards),
+          ..saved = (version: 'v1', cards: _cards, images: const {}),
       );
       await fresh.preload();
       await fresh.searchFlashcards(query: 'dose', tags: const [], page: 0);
@@ -141,5 +145,46 @@ void main() {
     expect(cards.first.isPaid, isTrue);
     expect(cards.first.tags, ['neo']);
     expect(cards.last.tags, isEmpty);
+  });
+
+  test('pictures come with the list; cards are found by id', () async {
+    final json = jsonEncode([
+      {
+        'id': 'a',
+        'question': 'Q',
+        'answer': 'A',
+        'packId': 'p',
+        'tags': ['topic--renal'],
+        'answerImageUrl': 'https://x/a.png',
+      },
+      {'id': 'b', 'question': 'Q2', 'answer': 'A2', 'packId': 'p'},
+    ]);
+    final gzip = base64Encode(GZipEncoder().encodeBytes(utf8.encode(json)));
+    final images = <String, CardImages>{};
+    decodeSearchCards(gzip, images: images);
+    expect(images.keys, ['a']);
+    expect(images['a']!.answer, 'https://x/a.png');
+
+    final service = _Service()
+      ..saved = (
+        version: 'img-1',
+        cards: decodeSearchCards(gzip),
+        images: images,
+      )
+      ..offline = true;
+    final repo = FlashcardsSearcherRepository(
+      flashcardsSearcherService: service,
+    );
+    final cards = await repo.cardsByIds(['b', 'missing', 'a']);
+    expect(cards.map((c) => c.id), ['b', 'a']);
+    expect(cards.last.answerImageUrl, 'https://x/a.png');
+    expect(cards.last.tags.single.isTopic, isTrue);
+  });
+
+  test('an older list (no pictures) is not used for cards', () async {
+    final repo = FlashcardsSearcherRepository(
+      flashcardsSearcherService: _Service(),
+    );
+    expect(await repo.cardsByIds(['1']), isEmpty);
   });
 }

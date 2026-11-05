@@ -170,4 +170,19 @@ void main() {
     expect(label, 'Tags: Topic: Cardiology');
     expect(exported!.single.title, 'Neonatology');
   });
+
+  test('the PDF uses the fonts built into the app', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final service = await PdfExportService.create(text: 'No Arabic here');
+    final bytes = await service.generateHighlightsPdf(
+      filterLabel: 'All highlights',
+      sections: highlightSectionsForExport(
+        highlights: highlights,
+        cards: cards,
+        packNames: names,
+      ),
+    );
+    expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+    expect(String.fromCharCodes(bytes), contains('Roboto'));
+  });
 }

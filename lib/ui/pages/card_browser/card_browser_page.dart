@@ -1,5 +1,5 @@
 import 'package:flashcards/data/repositories/card_sets/card_set_repository.dart';
-import 'package:flashcards/data/repositories/flashcards/flashcard_repository.dart';
+import 'package:flashcards/data/repositories/flashcards/fast_cards.dart';
 import 'package:flashcards/domain/models/flashcards/flashcard/flashcard.dart';
 import 'package:flashcards/ui/dialogs/card_sets/card_set_dialogs.dart';
 import 'package:flashcards/ui/widgets/core/desktop_layout.dart';
@@ -53,7 +53,7 @@ class CardBrowserPage extends StatefulWidget {
 }
 
 class _CardBrowserPageState extends State<CardBrowserPage> {
-  static const _pageSize = 30;
+  static const _pageSize = 100;
 
   List<String>? _ids;
   final _cards = <Flashcard>[];
@@ -96,9 +96,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     if (ids == null || _loadedIds >= ids.length) return;
     setState(() => _loading = true);
     final next = ids.skip(_loadedIds).take(_pageSize).toList();
-    final cards = await context.read<FlashcardRepository>().getFlashcardsByIds(
-      next,
-    );
+    final cards = await loadCardsFast(context, next);
     if (!mounted) return;
     setState(() {
       _cards.addAll(cards);

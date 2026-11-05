@@ -2,6 +2,7 @@ import 'package:flashcards/data/services/api/algolia_search/flashcards_searcher_
 import 'package:flashcards/data/services/api/algolia_search/local_search.dart';
 import 'package:flashcards/domain/models/algolia/algolia_flashcard/algolia_flashcard.dart';
 import 'package:flashcards/domain/models/algolia/pack_search_result/search_result_with_tags.dart';
+import 'package:flashcards/domain/models/flashcards/flashcard/flashcard.dart';
 import 'package:flashcards/domain/models/flashcards/tag/tag.dart';
 import 'package:flashcards/utils/result.dart';
 
@@ -12,6 +13,8 @@ class FlashcardsSearcherRepository {
   /// background; the cards already here are searched meanwhile).
   static const _checkAfter = Duration(minutes: 10);
   List<LocalSearchItem<AlgoliaFlashcard>>? _items;
+  Map<String, AlgoliaFlashcard> _byId = const {};
+  Map<String, CardImages> _images = const {};
   String? _version;
   DateTime? _checkedAt;
   Future<Result<void>>? _refreshing;
@@ -22,6 +25,8 @@ class FlashcardsSearcherRepository {
 
   void _use(SearchCards cards) {
     _version = cards.version;
+    _byId = {for (final card in cards.cards) card.objectID: card};
+    _images = cards.images;
     _items = cards.cards
         .map(
           (card) => LocalSearchItem(
@@ -72,6 +77,34 @@ class FlashcardsSearcherRepository {
     // With cards to search already, don't wait for the server.
     if (_items != null) return Result.ok(null);
     return refresh;
+  }
+
+  /// The cards with these ids that the search list has (in the same
+  /// order), so they can be shown without reading each from the server.
+  /// Missing ones (e.g. not in the list yet) are left out.
+  Future<List<Flashcard>> cardsByIds(Iterable<String> ids) async {
+    if (_items == null) {
+      await preload().timeout(
+        const Duration(seconds: 6),
+        onTimeout: () => Result.ok(null),
+      );
+    }
+    // Older lists have no pictures: the cards are read instead.
+    if (!(_version ?? '').startsWith('img-')) return const [];
+    return [
+      for (final id in ids)
+        if (_byId[id] case final card?)
+          Flashcard(
+            id: id,
+            packId: card.packId,
+            question: card.question,
+            answer: card.answer,
+            isPaid: card.isPaid,
+            tags: card.tags.map(Tag.fromId).toList(),
+            questionImageUrl: _images[id]?.question,
+            answerImageUrl: _images[id]?.answer,
+          ),
+    ];
   }
 
   /// Searches flashcards by question, answer and tags.
