@@ -16,7 +16,10 @@ import {deletePackProgressHandler} from "./handlers/deletePackProgress";
 import {renamePackEverywhereHandler} from "./handlers/renamePackEverywhere";
 import {deleteFlashcardEverywhereHandler} from "./handlers/deleteFlashcardEverywhere";
 import {updateFlashcardEverywhereHandler} from "./handlers/updateFlashcardEverywhere";
-import {createCustomSessionHandler} from "./handlers/createCustomSession";
+import {
+  countCustomSessionCardsHandler,
+  createCustomSessionHandler,
+} from "./handlers/createCustomSession";
 import {renameCustomSessionHandler} from "./handlers/renameCustomSession";
 import {
   deleteHighlightHandler,
@@ -83,6 +86,9 @@ export const updateFlashcardEverywhere = onCall(
 
 // fcp_data operations
 export const createCustomSession = onCall(createCustomSessionHandler);
+export const countCustomSessionCards = onCall(
+  countCustomSessionCardsHandler,
+);
 export const renameCustomSession = onCall(renameCustomSessionHandler);
 export const saveHighlight = onCall(saveHighlightHandler);
 export const deleteHighlight = onCall(deleteHighlightHandler);

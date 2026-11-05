@@ -6,6 +6,9 @@ import 'package:flashcards/utils/form_validations.dart';
 import 'package:flashcards/utils/result.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+/// Most cards an exam can have (the server allows the same).
+const maxExamCards = 5000;
+
 class SessionLimitCubit extends Cubit<SessionLimitState> {
   final CustomSessionRepository _customSessionRepo;
 
@@ -31,6 +34,27 @@ class SessionLimitCubit extends Cubit<SessionLimitState> {
     );
   }
 
+  /// The exact number of matching cards, with every tag and with any of
+  /// them; null if it couldn't be counted (e.g. offline).
+  Future<({int allTags, int anyTag})?> countMatching({
+    required PackSelectedFilter filter,
+    required List<String> selectedTags,
+    required List<String> packIds,
+    List<String> topics = const [],
+    List<String> excludeTags = const [],
+    String? studied,
+  }) async {
+    final result = await _customSessionRepo.countMatchingCards(
+      filter: filter,
+      tags: selectedTags,
+      packIds: packIds,
+      topics: topics,
+      excludeTags: excludeTags,
+      studied: studied,
+    );
+    return result is Ok<({int allTags, int anyTag})> ? result.value : null;
+  }
+
   void submitCustomSession({
     required String flashcardsCount,
     required int packFilterCount,
@@ -41,6 +65,7 @@ class SessionLimitCubit extends Cubit<SessionLimitState> {
     List<String> topics = const [],
     List<String> excludeTags = const [],
     String? studied,
+    bool matchAnyTag = false,
   }) async {
     final state = this.state;
     if (state is! SessionLimitLoaded) return;
@@ -66,6 +91,7 @@ class SessionLimitCubit extends Cubit<SessionLimitState> {
       topics: topics,
       excludeTags: excludeTags,
       studied: studied,
+      matchAnyTag: matchAnyTag,
     );
     switch (result) {
       case Error<void>(:final error):
@@ -86,7 +112,7 @@ class SessionLimitCubit extends Cubit<SessionLimitState> {
     putErrorIfExists(
       errors,
       'flashcardsCount',
-      validateClampedNumber(flashcardsCount, 1, packFilterCount, 1000),
+      validateClampedNumber(flashcardsCount, 1, packFilterCount, maxExamCards),
     );
 
     return errors;

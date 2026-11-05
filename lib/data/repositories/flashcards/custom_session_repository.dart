@@ -78,6 +78,7 @@ class CustomSessionRepository {
     List<String> topics = const [],
     List<String> excludeTags = const [],
     String? studied,
+    bool matchAnyTag = false,
   }) async {
     final request = CreateCustomSessionRequestDto(
       profileId: _getUid(),
@@ -88,6 +89,32 @@ class CustomSessionRepository {
       name: name,
     );
     return await _customSessionService.createCustomSession(
+      request,
+      topics: topics,
+      excludeTags: excludeTags,
+      studied: studied,
+      matchAnyTag: matchAnyTag,
+    );
+  }
+
+  /// The exact number of cards an exam with these choices would have, with
+  /// every chosen tag and with any of them.
+  Future<Result<({int allTags, int anyTag})>> countMatchingCards({
+    required PackSelectedFilter filter,
+    required List<String> tags,
+    required List<String> packIds,
+    List<String> topics = const [],
+    List<String> excludeTags = const [],
+    String? studied,
+  }) {
+    final request = CreateCustomSessionRequestDto(
+      profileId: _getUid(),
+      filter: filter,
+      tags: tags,
+      packIds: packIds,
+      sessionSize: 1,
+    );
+    return _customSessionService.countCustomSessionCards(
       request,
       topics: topics,
       excludeTags: excludeTags,

@@ -20,13 +20,38 @@ class CloudFunctionService {
     List<String> topics = const [],
     List<String> excludeTags = const [],
     String? studied,
+    bool matchAnyTag = false,
   }) async {
     return await _functions.httpsCallable("createCustomSession").call({
       ...request.toJson(),
       if (topics.isNotEmpty) 'topics': topics,
       if (excludeTags.isNotEmpty) 'excludeTags': excludeTags,
       'studied': ?studied,
+      if (matchAnyTag) 'tagMatch': 'any',
     });
+  }
+
+  /// How many cards an exam with these choices would have: with every tag
+  /// and with any of the tags.
+  Future<({int allTags, int anyTag})> countCustomSessionCards(
+    CreateCustomSessionRequestDto request, {
+    List<String> topics = const [],
+    List<String> excludeTags = const [],
+    String? studied,
+  }) async {
+    final result = await _functions
+        .httpsCallable("countCustomSessionCards")
+        .call({
+          ...request.toJson(),
+          if (topics.isNotEmpty) 'topics': topics,
+          if (excludeTags.isNotEmpty) 'excludeTags': excludeTags,
+          'studied': ?studied,
+        });
+    final data = Map<String, dynamic>.from(result.data as Map);
+    return (
+      allTags: (data['allTags'] as num).toInt(),
+      anyTag: (data['anyTag'] as num).toInt(),
+    );
   }
 
   /// Returns the name that was saved.

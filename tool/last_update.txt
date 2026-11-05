@@ -1,1 +1,1 @@
-FlashPedz update: 5 Nov 2026 (2) - Faster: card preview, browsing exam/set cards, highlights PDF. New exam button next to Examine Yourself.
+FlashPedz update: 5 Nov 2026 (3) - Exams: every matching card (no 1000-card limit), the real number shown, choose all tags or any tag. Also faster preview, card lists and highlights PDF; New exam button.

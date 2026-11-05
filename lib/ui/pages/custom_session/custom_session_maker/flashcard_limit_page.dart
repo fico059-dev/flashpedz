@@ -45,6 +45,50 @@ class _FlashcardLimitPageState extends State<FlashcardLimitPage> {
   late final TextEditingController _countCont;
   final _nameCont = TextEditingController();
 
+  /// The exact number of matching cards from the server (null while
+  /// counting, or if it couldn't count).
+  ({int allTags, int anyTag})? _exact;
+  var _counting = true;
+  var _matchAnyTag = false;
+
+  /// The number the app put in the box; once the student types another,
+  /// it is left alone.
+  String? _autoCount;
+
+  int? get _matching =>
+      _exact == null ? null : (_matchAnyTag ? _exact!.anyTag : _exact!.allTags);
+
+  StudiedCardsFilter get _studied => widget.filter == PackSelectedFilter.seen
+      ? context.read<StudiedFilterNotifier>().value
+      : StudiedCardsFilter.all;
+
+  Future<void> _countExact() async {
+    final picked = context.read<SessionTagPickerCubit>().state;
+    final exact = await context.read<SessionLimitCubit>().countMatching(
+      filter: widget.filter,
+      selectedTags: widget.selectedTags.toIdList(),
+      packIds: widget.selectedPacks.packIds,
+      topics: picked.selectedTopics,
+      excludeTags: picked.excludedTags,
+      studied: _studied.requestValue,
+    );
+    if (!mounted) return;
+    setState(() {
+      _exact = exact;
+      _counting = false;
+    });
+    _fillAll();
+  }
+
+  /// Puts every matching card in the box, unless the student typed a number.
+  void _fillAll({bool force = false}) {
+    final matching = _matching;
+    if (matching == null) return;
+    if (!force && _autoCount != null && _countCont.text != _autoCount) return;
+    _autoCount = '${matching.clamp(0, maxExamCards)}';
+    _countCont.text = _autoCount!;
+  }
+
   void _countFlashcards() {
     context.read<SessionLimitCubit>().loadData(
       packFilterCount: widget.packFilterCount,
@@ -58,8 +102,12 @@ class _FlashcardLimitPageState extends State<FlashcardLimitPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _countFlashcards());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _countFlashcards();
+      _countExact();
+    });
     _countCont = TextEditingController(text: widget.packFilterCount.toString());
+    _autoCount = _countCont.text;
   }
 
   @override
@@ -121,7 +169,16 @@ class _FlashcardLimitPageState extends State<FlashcardLimitPage> {
                           selectedTags: widget.selectedTags,
                           countCont: _countCont,
                           nameCont: _nameCont,
-                          packFilterCount: widget.packFilterCount,
+                          packFilterCount: _matching ?? widget.packFilterCount,
+                          counting: _counting,
+                          matching: _matching,
+                          exact: _exact,
+                          matchAnyTag: _matchAnyTag,
+                          onMatchAnyTag: (value) {
+                            setState(() => _matchAnyTag = value);
+                            _fillAll();
+                          },
+                          onUseAll: () => _fillAll(force: true),
                         );
                       default:
                         return SizedBox.shrink();
@@ -146,9 +203,21 @@ class _LoadedContent extends StatelessWidget {
   final TextEditingController countCont;
   final TextEditingController nameCont;
   final int packFilterCount;
+  final bool counting;
+  final int? matching;
+  final ({int allTags, int anyTag})? exact;
+  final bool matchAnyTag;
+  final ValueChanged<bool> onMatchAnyTag;
+  final VoidCallback onUseAll;
 
   const _LoadedContent({
     super.key,
+    required this.counting,
+    required this.matching,
+    required this.exact,
+    required this.matchAnyTag,
+    required this.onMatchAnyTag,
+    required this.onUseAll,
     required this.flashcardsCount,
     required this.isEstimatePrecise,
     required this.filter,
@@ -185,10 +254,15 @@ class _LoadedContent extends StatelessWidget {
         excludeTags: excluded,
         studied: studied.requestValue,
         name: typedName.isEmpty ? defaultName : typedName,
+        matchAnyTag: matchAnyTag,
       );
     }
 
-    final countText = isEstimatePrecise
+    final matching = this.matching;
+    final countText = matching != null
+        ? "$matching flashcards match your choices. How many would you "
+              "like in your exam?"
+        : isEstimatePrecise
         ? "$flashcardsCount flashcards are available. How many "
               "would you like in your exam?"
         : "Up to $flashcardsCount flashcards are available. How many "
@@ -198,8 +272,51 @@ class _LoadedContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: 15,
       children: [
-        Text(countText),
-        if (!isEstimatePrecise)
+        if (counting)
+          Row(
+            children: [
+              const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text("Counting the cards that match…")),
+            ],
+          )
+        else
+          Text(
+            countText,
+            style: matching != null
+                ? Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)
+                : null,
+          ),
+        if (exact != null && selectedTags.length > 1)
+          _TagMatchChoice(
+            tagNames: selectedTags.map((tag) => tag.name).toList(),
+            exact: exact!,
+            matchAnyTag: matchAnyTag,
+            onChanged: onMatchAnyTag,
+          ),
+        if (matching == 0)
+          CardFactory.warning(
+            isThreeLine: true,
+            title: Text("No cards match."),
+            subtitle: Text(
+              selectedTags.length > 1 && !matchAnyTag
+                  ? "No card has all of these tags. Choose \"Any of these "
+                        "tags\", or go back and pick fewer tags."
+                  : "Go back and choose other tags, topics or cards.",
+            ),
+          ),
+        if (matching != null && matching > maxExamCards)
+          Text(
+            "An exam can have up to $maxExamCards cards, so it will have "
+            "$maxExamCards of them, picked at random.",
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        if (!counting && matching == null && !isEstimatePrecise)
           CardFactory.warning(
             isThreeLine: true,
             title: Text("This number is an estimate."),
@@ -230,6 +347,17 @@ class _LoadedContent extends StatelessWidget {
           labelText: "Number of flashcards for session",
           textEditingController: countCont,
         ),
+        if (matching != null && matching > 0)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              onPressed: onUseAll,
+              icon: const Icon(Icons.select_all),
+              label: Text(
+                "Use all ${matching > maxExamCards ? maxExamCards : matching}",
+              ),
+            ),
+          ),
 
         _buildSectionTitle('Selected Packs'),
         Wrap(
@@ -311,4 +439,54 @@ Widget _buildSectionTitle(String title) {
       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
     ),
   );
+}
+
+/// All of the chosen tags, or any of them, with how many cards each gives.
+class _TagMatchChoice extends StatelessWidget {
+  final List<String> tagNames;
+  final ({int allTags, int anyTag}) exact;
+  final bool matchAnyTag;
+  final ValueChanged<bool> onChanged;
+
+  const _TagMatchChoice({
+    required this.tagNames,
+    required this.exact,
+    required this.matchAnyTag,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final names = tagNames.length > 3
+        ? '${tagNames.take(3).join(', ')}…'
+        : tagNames.join(matchAnyTag ? ' or ' : ' and ');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 6,
+      children: [
+        SegmentedButton<bool>(
+          showSelectedIcon: false,
+          segments: [
+            ButtonSegment(
+              value: false,
+              label: Text('All these tags (${exact.allTags})'),
+            ),
+            ButtonSegment(
+              value: true,
+              label: Text('Any of these tags (${exact.anyTag})'),
+            ),
+          ],
+          selected: {matchAnyTag},
+          onSelectionChanged: (value) => onChanged(value.first),
+        ),
+        Text(
+          matchAnyTag
+              ? 'Cards with at least one tag: $names.'
+              : 'Only cards that have every tag: $names.',
+          style: theme.textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
 }

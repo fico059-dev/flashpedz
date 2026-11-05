@@ -90,6 +90,7 @@ class CustomSessionService {
     List<String> topics = const [],
     List<String> excludeTags = const [],
     String? studied,
+    bool matchAnyTag = false,
   }) async {
     try {
       await _functions.createCustomSession(
@@ -97,12 +98,33 @@ class CustomSessionService {
         topics: topics,
         excludeTags: excludeTags,
         studied: studied,
+        matchAnyTag: matchAnyTag,
       );
       //final data = result.data as List<dynamic>;
 
       // final snapshots =
       //     data.map((item) => FlashcardSnapshotDto.fromJson(item)).toList();
       return Result.ok(null);
+    } on Exception catch (error) {
+      return Result.error(error);
+    }
+  }
+
+  Future<Result<({int allTags, int anyTag})>> countCustomSessionCards(
+    CreateCustomSessionRequestDto request, {
+    List<String> topics = const [],
+    List<String> excludeTags = const [],
+    String? studied,
+  }) async {
+    try {
+      return Result.ok(
+        await _functions.countCustomSessionCards(
+          request,
+          topics: topics,
+          excludeTags: excludeTags,
+          studied: studied,
+        ),
+      );
     } on Exception catch (error) {
       return Result.error(error);
     }
