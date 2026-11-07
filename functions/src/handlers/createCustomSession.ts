@@ -157,9 +157,6 @@ export function filterByAllTags<T extends {tags?: string[]}>(
 
 type FlashcardSnapshot = {
   id: string;
-  packId: string;
-  question: string;
-  answer: string;
   tags: string[];
   /** The student's progress, for cards they studied. */
   fsrs?: FsrsCardData;
@@ -360,79 +357,89 @@ export async function createCustomSessionHandler(request: CallableRequest) {
   }
 }
 
+/** A pack's cards: only ids and tags, which is all an exam needs. */
+type PackCard = {id: string; tags: string[]};
+
+/** Pack cards are read again after this long (ms). */
+const packCardsCacheMs = 3 * 60 * 1000;
+const packCardsCache = new Map<string, {at: number; cards: PackCard[]}>();
+
+/**
+ * The cards of the packs (ids and tags only, so even big packs read
+ * quickly), kept for a few minutes: counting the cards and then making
+ * the exam, or making several exams, reads each pack once.
+ * @param {string[]} packIds The packs.
+ * @return {Promise<PackCard[]>} Their cards.
+ */
+export async function packCards(packIds: string[]): Promise<PackCard[]> {
+  const now = Date.now();
+  const missing = packIds.filter((id) => {
+    const kept = packCardsCache.get(id);
+    return !kept || now - kept.at > packCardsCacheMs;
+  });
+  if (missing.length > 0) {
+    const snapshot = await getFirestore().collection("flashcards")
+      .where("packId", "in", missing)
+      .select("packId", "tags")
+      .get();
+    const byPack = new Map<string, PackCard[]>(missing.map((id) => [id, []]));
+    for (const doc of snapshot.docs) {
+      const tags = doc.get("tags");
+      byPack.get(doc.get("packId") as string)?.push({
+        id: doc.id,
+        tags: Array.isArray(tags) ? tags : [],
+      });
+    }
+    for (const [id, cards] of byPack) {
+      packCardsCache.set(id, {at: now, cards});
+    }
+  }
+  return packIds.flatMap((id) => packCardsCache.get(id)?.cards ?? []);
+}
+
+/**
+ * The cards of the packs that the filter picks, with their current tags
+ * and, for studied cards, the student's progress.
+ * @param {PackSelectedFilter} filter Which cards.
+ * @param {string[]} packIds The packs.
+ * @param {string} profileId The student.
+ * @return {Promise<FlashcardSnapshot[]>} The cards.
+ */
 async function getFlashcardsByFilter(
   filter: PackSelectedFilter,
   packIds: string[],
   profileId: string,
 ): Promise<FlashcardSnapshot[]> {
   const db = getFirestore();
+  const progress = db
+    .collection("fcp_data")
+    .where("profileId", "==", profileId)
+    .where("flashcardSnapshot.packId", "in", packIds);
+
+  if (filter === PackSelectedFilter.all) {
+    const cards = await packCards(packIds);
+    logger.info(`Found ${cards.length} flashcards in packs`, {packIds});
+    return cards;
+  }
 
   // Unseen: cards of the packs without a progress record (never studied,
   // in regular study or a custom session, bookmarked or ignored).
   if (filter === PackSelectedFilter.unseen) {
-    const [cards, progress] = await Promise.all([
-      db.collection("flashcards").where("packId", "in", packIds).get(),
-      db
-        .collection("fcp_data")
-        .where("profileId", "==", profileId)
-        .where("flashcardSnapshot.packId", "in", packIds)
-        .select("flashcardId")
-        .get(),
+    const [cards, seen] = await Promise.all([
+      packCards(packIds),
+      progress.select("flashcardId").get(),
     ]);
     const seenIds = new Set(
-      progress.docs.map((doc) => doc.get("flashcardId") as string),
+      seen.docs.map((doc) => doc.get("flashcardId") as string),
     );
-    const unseen: FlashcardSnapshot[] = cards.docs
-      .filter((doc) => !seenIds.has(doc.id))
-      .map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          packId: data.packId,
-          question: data.question,
-          answer: data.answer,
-          tags: data.tags ?? [],
-        };
-      });
-
-    logger.info(
-      `Found ${unseen.length} unseen of ${cards.size} flashcards in packs`,
-      {packIds},
-    );
+    const unseen = cards.filter((card) => !seenIds.has(card.id));
+    logger.info(`Found ${unseen.length} unseen of ${cards.length} cards`, {
+      packIds,
+    });
     return unseen;
   }
 
-  // prvo da vidimo za "all" slucaj
-  if (filter === PackSelectedFilter.all) {
-    // Every card of the packs (no limit, so no matching card is missed).
-    const snapshot = await db.collection("flashcards")
-      .where("packId", "in", packIds)
-      .select("packId", "question", "answer", "tags")
-      .get();
-
-    const flashcardSnapshots: FlashcardSnapshot[] = snapshot.docs.map(
-      (doc) => {
-        const data = doc.data()!;
-        return {
-          id: doc.id,
-          packId: data.packId,
-          question: data.question,
-          answer: data.answer,
-          tags: data.tags ?? [],
-        } as FlashcardSnapshot;
-      },
-    );
-
-    logger.info(`Found ${flashcardSnapshots.length} flashcards in packs`, {
-      packIds,
-    });
-    return flashcardSnapshots;
-  }
-
-  let query = db
-    .collection("fcp_data")
-    .where("profileId", "==", profileId)
-    .where("flashcardSnapshot.packId", "in", packIds);
+  let query = progress;
   switch (filter) {
   case PackSelectedFilter.seen:
     // kartica je seen ako je u fcp_data kolekciji
@@ -453,27 +460,19 @@ async function getFlashcardsByFilter(
 
   // The cards' tags now (tags added after the card was studied count too),
   // read with the student's progress.
-  const [snapshot, current] = await Promise.all([
-    query.get(),
-    db.collection("flashcards")
-      .where("packId", "in", packIds)
-      .select("tags")
-      .get(),
+  const [snapshot, cards] = await Promise.all([
+    query.select("flashcardId", "fsrs_card", "flashcardSnapshot.tags").get(),
+    packCards(packIds),
   ]);
-  const currentTags = new Map(
-    current.docs.map((doc) => [doc.id, doc.get("tags") as string[] | undefined]),
-  );
+  const currentTags = new Map(cards.map((card) => [card.id, card.tags]));
   const flashcardSnapshots: FlashcardSnapshot[] = snapshot.docs.map((doc) => {
-    const fcSnapshot = doc.data().flashcardSnapshot;
-    const id = doc.data().flashcardId;
+    const id = doc.get("flashcardId") as string;
+    const oldTags = doc.get("flashcardSnapshot.tags");
     return {
       id,
-      packId: fcSnapshot.packId,
-      question: fcSnapshot.question,
-      answer: fcSnapshot.answer,
-      tags: currentTags.get(id) ?? fcSnapshot.tags ?? [],
-      fsrs: doc.data().fsrs_card ?? {},
-    } as FlashcardSnapshot;
+      tags: currentTags.get(id) ?? (Array.isArray(oldTags) ? oldTags : []),
+      fsrs: doc.get("fsrs_card") ?? {},
+    };
   });
 
   logger.info(`Found ${flashcardSnapshots.length} flashcards in fcp_data`, {

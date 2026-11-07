@@ -37,7 +37,13 @@ class SessionProgressStore {
   /// Reads the other devices' latest counts; the next reads use them.
   Future<void> refresh() async {
     try {
-      await _logStore?.loadCombined(fresh: true, timeout: syncWait);
+      // A copy from the last half minute (e.g. the home page) is fresh
+      // enough, so a session starts at once.
+      await _logStore?.loadCombined(
+        fresh: true,
+        timeout: const Duration(seconds: 3),
+        freshEnough: const Duration(seconds: 30),
+      );
     } catch (_) {
       // Offline: this device's counts are used.
     }

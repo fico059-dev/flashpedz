@@ -75,14 +75,25 @@ class StudyLogStore {
   Future<StudyLog> loadCombined({
     bool fresh = false,
     Duration timeout = const Duration(seconds: 10),
+
+    /// With [fresh]: the other devices' copy read this recently is used
+    /// as it is (no waiting for the server).
+    Duration? freshEnough,
   }) async {
-    // Send recent reviews first, so the online copy is complete.
-    if (_uploadTimer?.isActive ?? false) await uploadNow();
+    // Recent reviews go online in the background: this device's own
+    // counts come from here, so nothing waits for the upload.
+    if (_uploadTimer?.isActive ?? false) unawaited(uploadNow());
     final local = await load();
     final uid = _uid;
     if (_remote == null || uid == null) return local;
 
-    if (fresh) _remoteCache = null;
+    final cache = _remoteCache;
+    if (fresh &&
+        !(freshEnough != null &&
+            cache != null &&
+            DateTime.now().difference(cache.$1) < freshEnough)) {
+      _remoteCache = null;
+    }
     final remote = await _fetchRemote(uid, timeout);
     if (remote == null) return local;
 

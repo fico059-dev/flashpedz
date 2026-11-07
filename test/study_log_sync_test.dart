@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fake_async/fake_async.dart';
 import 'package:flashcards/data/services/local/session_progress_store.dart';
 import 'package:flashcards/data/services/local/study_log_store.dart';
@@ -245,7 +247,9 @@ void main() {
       );
     }
     await phone.uploadNow();
-    await webSession.refresh();
+    // (A session start reuses a copy from the last half minute; this
+    // reads the server.)
+    await web.loadCombined(fresh: true);
     expect(await webSession.studiedToday(), (newCards: 3, reviews: 2));
 
     // The latest choice wins; turning them off is shared too.
@@ -259,4 +263,50 @@ void main() {
     );
     expect(restored.dailyLimits, (newCards: 5, reviews: 0));
   });
+
+  test('a session start right after the home page does not wait', () async {
+    final remote = _CountingRemote();
+    final store = StudyLogStore(
+      authService: FakeAuth(),
+      prefs: _MemoryPrefs(),
+      remote: remote,
+    );
+    final session = SessionProgressStore(logStore: store);
+    await store.loadCombined(); // The home page.
+    expect(remote.fetches, 1);
+    await session.refresh(); // Starting a session.
+    expect(remote.fetches, 1);
+
+    // Reviews are sent in the background, not before reading.
+    await store.update(
+      (log) =>
+          log.recordReview(now: DateTime.now(), isNew: true, forgot: false),
+    );
+    remote.slowSave = Completer<void>();
+    final read = store.loadCombined();
+    expect(await read.timeout(const Duration(seconds: 1)), isNotNull);
+    remote.slowSave!.complete();
+  });
+}
+
+/// Counts reads; saving can be made to hang (a slow connection).
+class _CountingRemote extends _FakeRemote {
+  int fetches = 0;
+  Completer<void>? slowSave;
+
+  @override
+  Future<({Map<String, String> devices, String? goal})> fetch() {
+    fetches++;
+    return super.fetch();
+  }
+
+  @override
+  Future<void> save({
+    required String deviceId,
+    required String log,
+    String? goal,
+  }) async {
+    await slowSave?.future;
+    return super.save(deviceId: deviceId, log: log, goal: goal);
+  }
 }

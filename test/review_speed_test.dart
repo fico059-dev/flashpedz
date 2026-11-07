@@ -176,16 +176,17 @@ void main() {
     bloc.upcomingImages.listen(images.add);
     await load();
     expect(loaded().statRecord.flashcardId, 'a');
-    expect(fcpRepo.fetched, ['a', 'b', 'c', 'd']);
+    // The next five cards (here the four left).
+    expect(fcpRepo.fetched, ['a', 'b', 'c', 'd', 'e']);
     expect(
       images,
       containsAll([
         'https://img/b.jpg',
         'https://img/c.jpg',
         'https://img/d.jpg',
+        'https://img/e.jpg',
       ]),
     );
-    expect(images, isNot(contains('https://img/e.jpg')));
   });
 
   test('moves on even when the server never confirms the saves', () async {

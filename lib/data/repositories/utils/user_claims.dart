@@ -91,6 +91,15 @@ class UserClaims {
     return claims;
   }
 
+  /// When the sign-in token was last renewed on purpose, and for whom.
+  static DateTime? _renewedAt;
+  static String? _renewedFor;
+
+  /// How often the token is renewed to pick up subscription changes. In
+  /// between, the token the app already has is used (no network), so
+  /// opening packs and sessions doesn't wait. Purchases renew it at once.
+  static const renewEvery = Duration(minutes: 10);
+
   static Future<UserClaims> current() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -102,7 +111,25 @@ class UserClaims {
         allExpMs: 0,
       );
     }
-    final token = await user.getIdTokenResult(true);
+    final now = DateTime.now();
+    final renewedAt = _renewedAt;
+    final renew =
+        _renewedFor != user.uid ||
+        renewedAt == null ||
+        now.difference(renewedAt) > renewEvery;
+    if (renew) {
+      _renewedAt = now;
+      _renewedFor = user.uid;
+    }
+    IdTokenResult token;
+    try {
+      token = await user.getIdTokenResult(renew);
+    } catch (_) {
+      if (!renew) rethrow;
+      // Offline: the token the app has.
+      _renewedAt = null;
+      token = await user.getIdTokenResult();
+    }
     final map =
         token.claims?.map((k, v) => MapEntry(k, v)) ?? <String, dynamic>{};
     return UserClaims.fromMap(map);

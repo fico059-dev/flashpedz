@@ -85,8 +85,14 @@ export const updateFlashcardEverywhere = onCall(
 );
 
 // fcp_data operations
-export const createCustomSession = onCall(createCustomSessionHandler);
+// Exams read the tags of every card of the chosen packs: memory (and the
+// faster processor that comes with it) like the card search.
+export const createCustomSession = onCall(
+  {memory: "1GiB", timeoutSeconds: 120},
+  createCustomSessionHandler,
+);
 export const countCustomSessionCards = onCall(
+  {memory: "1GiB", timeoutSeconds: 120},
   countCustomSessionCardsHandler,
 );
 export const renameCustomSession = onCall(renameCustomSessionHandler);

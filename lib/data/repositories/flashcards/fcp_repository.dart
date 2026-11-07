@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flashcards/data/repositories/utils/user_claims.dart';
 import 'package:flashcards/data/services/api/dto/flashcards/custom_session/flashcard_ids/flashcard_ids_dto.dart';
@@ -261,12 +262,16 @@ class FcpRepository {
   Future<Result<StatRecord>> getStatRecordForFlashcardId(
     String flashcardId,
   ) async {
+    // The progress and the card are read at the same time (one wait
+    // instead of two); the card is used when the student has no progress.
+    final cardRead = _flashcardService.getDocument(flashcardId);
     final result = await _fcpService.getFcpDataDocument(
       profileId: _getUid(),
       flashcardId: flashcardId,
     );
     switch (result) {
       case Ok<FcpDataDto>():
+        unawaited(cardRead.then((_) {}, onError: (_) {}));
         return Result.ok(result.value.toStatRecordDomain());
       case Error<FcpDataDto>():
     }
@@ -275,8 +280,7 @@ class FcpRepository {
     if (error is! DocumentDoesntExistException) {
       return Result.error(error);
     }
-    // if fcp_data doc doesn't exist, pull from flashcards
-    final fcResult = await _flashcardService.getDocument(flashcardId);
+    final fcResult = await cardRead;
     switch (fcResult) {
       case Error<FlashcardDto>(:final error):
         return Result.error(error);

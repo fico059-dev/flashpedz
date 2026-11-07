@@ -59,7 +59,7 @@ class SessionTestBloc extends Bloc<SessionTestEvent, SessionTestState> {
   /// Upcoming cards, downloaded while the current one is studied.
   final _prefetched = <String, Future<Result<StatRecord>>>{};
   final _readyRecords = <String, StatRecord>{};
-  static const _prefetchCount = 3;
+  static const _prefetchCount = 5;
 
   /// Image URLs of downloaded upcoming cards, so the page can load the
   /// pictures before they are shown.
