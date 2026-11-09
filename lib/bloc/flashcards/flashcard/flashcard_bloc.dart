@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flashcards/bloc/flashcards/flashcard/flashcard_event.dart';
+import 'package:flashcards/bloc/flashcards/session_score/session_score.dart';
 import 'package:flashcards/bloc/flashcards/flashcard/flashcard_state.dart';
 import 'package:flashcards/data/repositories/flashcards/fcp_repository.dart';
 import 'package:flashcards/data/repositories/flashcards/pp_repository.dart';
@@ -56,8 +57,12 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
   final _readyFlashcards = <String, Flashcard>{};
   static const _prefetchCount = 3;
 
+  /// Right and wrong answers in this session, for the top of the screen.
+  final score = SessionScore();
+
   @override
   Future<void> close() {
+    score.dispose();
     // Once the last ratings are saved, share the session's count right away
     // so another device opened next continues from here.
     unawaited(_saver.settle().then((_) => _sessionProgress.flush()));
@@ -344,6 +349,7 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
     final before = last.before;
     final flashcard = before.flashcard;
     if (flashcard == null || last.index >= state.statRecords.length) return;
+    score.remove(correct: last.correct);
 
     _saver.run('undo', () => _fcpRepo.restoreCard(before: before));
     if (last.countedKey != null) {
@@ -426,8 +432,10 @@ class FlashcardBloc extends Bloc<FlashcardEvent, FlashcardState> {
         batch: state.currentBatch,
         before: state.statRecords[state.currentCardIndex],
         countedKey: countedKey,
+        correct: event.rating != Rating.again,
       ),
     );
+    score.add(correct: event.rating != Rating.again);
 
     final oldCard = state.statRecords[state.currentCardIndex].card;
     final newCard = FSRS().repeat(oldCard, DateTime.now())[event.rating]!.card;
@@ -927,10 +935,14 @@ class _RatedCard {
   /// The session counter the rating was counted in, if any.
   final String? countedKey;
 
+  /// Whether the card was remembered (not Again).
+  final bool correct;
+
   const _RatedCard({
     required this.index,
     required this.batch,
     required this.before,
+    required this.correct,
     this.countedKey,
   });
 }

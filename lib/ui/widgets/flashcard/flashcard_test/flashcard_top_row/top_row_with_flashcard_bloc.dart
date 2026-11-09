@@ -13,6 +13,7 @@ import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row
 import 'package:flashcards/ui/dialogs/flashcard/share_card_dialog.dart';
 import 'package:flashcards/ui/dialogs/card_sets/card_set_dialogs.dart';
 import 'package:flashcards/ui/dialogs/flashcard/session_target_dialog.dart';
+import 'package:flashcards/ui/widgets/flashcard/session_score_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flashcards/data/services/local/session_progress_store.dart';
 import 'package:flashcards/ui/dialogs/flashcard/daily_limits_dialog.dart';
@@ -59,84 +60,99 @@ class TopRowWithFlashcardBloc extends StatelessWidget {
           enabled = true;
         }
 
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        final score = context.read<FlashcardBloc>().score;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (state.currentBatch > 0)
-              BatchCounter(
-                currentBatch: state.currentBatch,
-                currentFlashcard: currFlashcard,
-                allFlashcards: allFlashcards,
-              )
-            else
-              _TargetButton(
-                enabled:
-                    state.testType == TestType.regular &&
-                    state.pack != null &&
-                    state.status.isLoaded,
-                child: QuestionCounter(
-                  currentFlashcard: currFlashcard,
-                  allFlashcards: allFlashcards,
-                ),
-              ),
-
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                UndoButton(
-                  onUndo: context.read<FlashcardBloc>().canUndo
-                      ? () => context.read<FlashcardBloc>().add(
-                          FlashcardUndoPressed(),
-                        )
-                      : null,
-                ),
-                AdminEditCardButton(
-                  flashcard: state.flashcard == null
-                      ? null
-                      : state.statRecords[state.currentCardIndex].flashcard,
-                  onEdited: (card) =>
-                      context.read<FlashcardBloc>().add(FlashcardEdited(card)),
-                ),
-                IconButton(
-                  tooltip: 'Search cards',
-                  icon: const Icon(Icons.search),
-                  onPressed: () =>
-                      context.router.push(StudySearchRoute(pack: state.pack)),
-                ),
-                IconButton(
-                  tooltip: 'Share card',
-                  icon: const Icon(Icons.share_outlined),
-                  onPressed: state.flashcard == null
-                      ? null
-                      : () => showShareCardDialog(context, state.flashcard!),
-                ),
-                BookmarkButton(
-                  isBookmarked: isBookmarked,
-                  onToggleBookmark: onToggleBookmark,
-                ),
+                if (state.currentBatch > 0)
+                  BatchCounter(
+                    currentBatch: state.currentBatch,
+                    currentFlashcard: currFlashcard,
+                    allFlashcards: allFlashcards,
+                  )
+                else
+                  _TargetButton(
+                    enabled:
+                        state.testType == TestType.regular &&
+                        state.pack != null &&
+                        state.status.isLoaded,
+                    child: QuestionCounter(
+                      currentFlashcard: currFlashcard,
+                      allFlashcards: allFlashcards,
+                    ),
+                  ),
 
-                PopupMenuButtonTopRow(
-                  onIgnore: onIgnore,
-                  onAddToSet: state.flashcard == null
-                      ? null
-                      : () => showAddToSetSheet(context, state.flashcard!.id),
-                  onReport: () {
-                    // In a pack with sub-packs, the card may be from one
-                    // of the sub-packs.
-                    final pack = state.pack!;
-                    final cardPackId = state.flashcard!.packId;
-                    final cardPack = [
-                      pack,
-                      ...pack.subPacks,
-                    ].firstWhere((p) => p.id == cardPackId, orElse: () => pack);
-                    onReport(
-                      packName: cardPack.name,
-                      flashcard: state.flashcard!,
-                      packId: cardPack.id,
-                    );
-                  },
-                  enabled: enabled,
+                Row(
+                  children: [
+                    UndoButton(
+                      onUndo: context.read<FlashcardBloc>().canUndo
+                          ? () => context.read<FlashcardBloc>().add(
+                              FlashcardUndoPressed(),
+                            )
+                          : null,
+                    ),
+                    AdminEditCardButton(
+                      flashcard: state.flashcard == null
+                          ? null
+                          : state.statRecords[state.currentCardIndex].flashcard,
+                      onEdited: (card) => context.read<FlashcardBloc>().add(
+                        FlashcardEdited(card),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Search cards',
+                      icon: const Icon(Icons.search),
+                      onPressed: () => context.router.push(
+                        StudySearchRoute(pack: state.pack),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Share card',
+                      icon: const Icon(Icons.share_outlined),
+                      onPressed: state.flashcard == null
+                          ? null
+                          : () =>
+                                showShareCardDialog(context, state.flashcard!),
+                    ),
+                    BookmarkButton(
+                      isBookmarked: isBookmarked,
+                      onToggleBookmark: onToggleBookmark,
+                    ),
+
+                    PopupMenuButtonTopRow(
+                      onIgnore: onIgnore,
+                      onAddToSet: state.flashcard == null
+                          ? null
+                          : () =>
+                                showAddToSetSheet(context, state.flashcard!.id),
+                      onReport: () {
+                        // In a pack with sub-packs, the card may be from one
+                        // of the sub-packs.
+                        final pack = state.pack!;
+                        final cardPackId = state.flashcard!.packId;
+                        final cardPack = [pack, ...pack.subPacks].firstWhere(
+                          (p) => p.id == cardPackId,
+                          orElse: () => pack,
+                        );
+                        onReport(
+                          packName: cardPack.name,
+                          flashcard: state.flashcard!,
+                          packId: cardPack.id,
+                        );
+                      },
+                      enabled: enabled,
+                    ),
+                  ],
                 ),
               ],
+            ),
+            ListenableBuilder(
+              listenable: score,
+              builder: (context, _) =>
+                  SessionScoreBar(correct: score.correct, wrong: score.wrong),
             ),
           ],
         );

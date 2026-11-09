@@ -158,9 +158,12 @@ void main() {
     expect(bloc.state.currentCardIndex, 1);
     expect(bloc.state.statRecords[0].card.reps, 1);
     expect(bloc.canUndo, isTrue);
+    // The score at the top: one right.
+    expect((bloc.score.correct, bloc.score.wrong), (1, 0));
 
     bloc.add(FlashcardUndoPressed());
     await tester.pump(const Duration(milliseconds: 10));
+    expect((bloc.score.correct, bloc.score.wrong), (0, 0));
     expect(bloc.state.currentCardIndex, 0);
     expect(bloc.state.flashcard?.id, 'c1');
     expect(bloc.state.answerVisible, isFalse);

@@ -1,1 +1,1 @@
-FlashPedz update: 7 Nov 2026 - Faster exams and sessions: exams read only card tags (1 GB server memory), sessions don't wait for sign-in renewals or uploads, exam cards load together and 5 ahead.
+FlashPedz update: 9 Nov 2026 - Score at the top while studying: correct, wrong and % (packs and exams). Also faster exams and sessions (7 Nov).

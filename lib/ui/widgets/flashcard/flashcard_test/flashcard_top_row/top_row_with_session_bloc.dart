@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flashcards/bloc/flashcards/session_test/session_test_bloc.dart';
 import 'package:flashcards/bloc/flashcards/session_test/session_test_event.dart';
@@ -11,6 +13,7 @@ import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row
 import 'package:flashcards/ui/widgets/flashcard/flashcard_test/flashcard_top_row/widgets/undo_button.dart';
 import 'package:flashcards/ui/dialogs/flashcard/share_card_dialog.dart';
 import 'package:flashcards/ui/dialogs/card_sets/card_set_dialogs.dart';
+import 'package:flashcards/ui/widgets/flashcard/session_score_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -32,7 +35,7 @@ class TopRowWithSessionBloc extends StatelessWidget {
     return BlocSelector<
       SessionTestBloc,
       SessionTestState,
-      (int, int, bool?, Flashcard, String, bool)
+      (int, int, bool?, Flashcard, String, bool, int, int)
     >(
       selector: (state) {
         if (state is! SessionTestLoaded) {
@@ -50,6 +53,9 @@ class TopRowWithSessionBloc extends StatelessWidget {
           state.statRecord.flashcard!,
           state.unformattedQuestion,
           context.read<SessionTestBloc>().canUndo,
+          // Answered so far: right, and wrong (Again).
+          state.session.correctCount,
+          max(0, currentIndex - state.session.correctCount),
         );
       },
       builder: (context, tuple) {
@@ -60,59 +66,65 @@ class TopRowWithSessionBloc extends StatelessWidget {
         // The card as stored, with any cloze not hidden.
         final storedCard = flashcard.copyWith(question: tuple.$5);
 
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            QuestionCounter(
-              currentFlashcard: currentIndex,
-              allFlashcards: allCount,
-            ),
-
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                UndoButton(
-                  onUndo: tuple.$6
-                      ? () => context.read<SessionTestBloc>().add(
-                          SessionTestUndoPressed(),
-                        )
-                      : null,
-                ),
-                AdminEditCardButton(
-                  flashcard: hasBookmark == null ? null : storedCard,
-                  onEdited: (card) => context.read<SessionTestBloc>().add(
-                    SessionTestCardEdited(card),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Search cards',
-                  icon: const Icon(Icons.search),
-                  onPressed: () => context.router.push(StudySearchRoute()),
-                ),
-                IconButton(
-                  tooltip: 'Share card',
-                  icon: const Icon(Icons.share_outlined),
-                  onPressed: hasBookmark == null
-                      ? null
-                      : () => showShareCardDialog(context, flashcard),
-                ),
-                BookmarkButton(
-                  isBookmarked: hasBookmark ?? false,
-                  onToggleBookmark: hasBookmark != null
-                      ? onToggleBookmark
-                      : null,
+                QuestionCounter(
+                  currentFlashcard: currentIndex,
+                  allFlashcards: allCount,
                 ),
 
-                PopupMenuButtonTopRow(
-                  onAddToSet: hasBookmark != null
-                      ? () => showAddToSetSheet(context, flashcard.id)
-                      : null,
-                  onReport: hasBookmark != null
-                      ? () => onReport(flashcard: flashcard)
-                      : null,
-                  enabled: true,
+                Row(
+                  children: [
+                    UndoButton(
+                      onUndo: tuple.$6
+                          ? () => context.read<SessionTestBloc>().add(
+                              SessionTestUndoPressed(),
+                            )
+                          : null,
+                    ),
+                    AdminEditCardButton(
+                      flashcard: hasBookmark == null ? null : storedCard,
+                      onEdited: (card) => context.read<SessionTestBloc>().add(
+                        SessionTestCardEdited(card),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Search cards',
+                      icon: const Icon(Icons.search),
+                      onPressed: () => context.router.push(StudySearchRoute()),
+                    ),
+                    IconButton(
+                      tooltip: 'Share card',
+                      icon: const Icon(Icons.share_outlined),
+                      onPressed: hasBookmark == null
+                          ? null
+                          : () => showShareCardDialog(context, flashcard),
+                    ),
+                    BookmarkButton(
+                      isBookmarked: hasBookmark ?? false,
+                      onToggleBookmark: hasBookmark != null
+                          ? onToggleBookmark
+                          : null,
+                    ),
+
+                    PopupMenuButtonTopRow(
+                      onAddToSet: hasBookmark != null
+                          ? () => showAddToSetSheet(context, flashcard.id)
+                          : null,
+                      onReport: hasBookmark != null
+                          ? () => onReport(flashcard: flashcard)
+                          : null,
+                      enabled: true,
+                    ),
+                  ],
                 ),
               ],
             ),
+            SessionScoreBar(correct: tuple.$7, wrong: tuple.$8),
           ],
         );
       },
