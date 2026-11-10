@@ -213,6 +213,12 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // The "update available" notice: everyone reads it, admins set it.
+    match /app_config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /osces/{osceId} {
       allow read: if isLoggedIn();
       allow write: if isAdmin();

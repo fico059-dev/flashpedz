@@ -15,6 +15,7 @@ import 'package:flashcards/ui/pages/main_tab_pages/main_tab_routes.dart';
 import 'package:flashcards/ui/widgets/core/desktop_layout.dart';
 import 'package:flashcards/ui/widgets/core/app_bar_streak.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flashcards/ui/widgets/app_update/app_update_checker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -177,86 +178,89 @@ class _MainTabPageState extends State<MainTabPage> with AutoRouteAware {
 
   @override
   Widget build(BuildContext context) {
-    return AutoTabsRouter(
-      routes: MainTabRoutes.mainTabPages,
-      builder: (context, child) {
-        final tabsRouter = AutoTabsRouter.of(context);
-        _tabsRouter ??= tabsRouter;
+    // Tells the student when a new app version is out.
+    return AppUpdateChecker(
+      child: AutoTabsRouter(
+        routes: MainTabRoutes.mainTabPages,
+        builder: (context, child) {
+          final tabsRouter = AutoTabsRouter.of(context);
+          _tabsRouter ??= tabsRouter;
 
-        final title = MainTabRoutes.getRouteTitle(context, tabsRouter);
-        _assignAppBarActions();
+          final title = MainTabRoutes.getRouteTitle(context, tabsRouter);
+          _assignAppBarActions();
 
-        // Computers get a side menu, phones the bottom tab bar.
-        final wide = isWideLayout(context);
+          // Computers get a side menu, phones the bottom tab bar.
+          final wide = isWideLayout(context);
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(title),
-            leading: wide
-                ? null
-                : IconButton(
-                    icon: Icon(CupertinoIcons.profile_circled),
-                    onPressed: () {
-                      context.router.push(ProfileRoute());
-                    },
-                  ),
-            automaticallyImplyLeading: false,
-            actions: [...appBarActions, const AppBarStreak()],
-          ),
-          body: wide
-              ? Row(
-                  children: [
-                    NavigationRail(
-                      extended: MediaQuery.sizeOf(context).width >= 1100,
-                      minExtendedWidth: 200,
-                      selectedIndex: tabsRouter.activeIndex,
-                      onDestinationSelected: tabsRouter.setActiveIndex,
-                      labelType: MediaQuery.sizeOf(context).width >= 1100
-                          ? NavigationRailLabelType.none
-                          : NavigationRailLabelType.all,
-                      destinations: [
-                        for (final d in _destinations)
-                          NavigationRailDestination(
-                            icon: Icon(d.icon),
-                            selectedIcon: Icon(d.selected),
-                            label: Text(d.label),
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(title),
+              leading: wide
+                  ? null
+                  : IconButton(
+                      icon: Icon(CupertinoIcons.profile_circled),
+                      onPressed: () {
+                        context.router.push(ProfileRoute());
+                      },
+                    ),
+              automaticallyImplyLeading: false,
+              actions: [...appBarActions, const AppBarStreak()],
+            ),
+            body: wide
+                ? Row(
+                    children: [
+                      NavigationRail(
+                        extended: MediaQuery.sizeOf(context).width >= 1100,
+                        minExtendedWidth: 200,
+                        selectedIndex: tabsRouter.activeIndex,
+                        onDestinationSelected: tabsRouter.setActiveIndex,
+                        labelType: MediaQuery.sizeOf(context).width >= 1100
+                            ? NavigationRailLabelType.none
+                            : NavigationRailLabelType.all,
+                        destinations: [
+                          for (final d in _destinations)
+                            NavigationRailDestination(
+                              icon: Icon(d.icon),
+                              selectedIcon: Icon(d.selected),
+                              label: Text(d.label),
+                            ),
+                        ],
+                        trailingAtBottom: true,
+                        trailing: Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: IconButton(
+                            tooltip: "Profile",
+                            icon: Icon(CupertinoIcons.profile_circled),
+                            onPressed: () {
+                              context.router.push(ProfileRoute());
+                            },
                           ),
-                      ],
-                      trailingAtBottom: true,
-                      trailing: Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: IconButton(
-                          tooltip: "Profile",
-                          icon: Icon(CupertinoIcons.profile_circled),
-                          onPressed: () {
-                            context.router.push(ProfileRoute());
-                          },
                         ),
                       ),
-                    ),
-                    const VerticalDivider(width: 1),
-                    Expanded(
-                      child: ReadableWidth(maxWidth: 1000, child: child),
-                    ),
-                  ],
-                )
-              : child,
-          bottomNavigationBar: wide
-              ? null
-              : NavigationBar(
-                  onDestinationSelected: tabsRouter.setActiveIndex,
-                  selectedIndex: tabsRouter.activeIndex,
-                  destinations: [
-                    for (final d in _destinations)
-                      NavigationDestination(
-                        selectedIcon: Icon(d.selected),
-                        icon: Icon(d.icon),
-                        label: d.label,
+                      const VerticalDivider(width: 1),
+                      Expanded(
+                        child: ReadableWidth(maxWidth: 1000, child: child),
                       ),
-                  ],
-                ),
-        );
-      },
+                    ],
+                  )
+                : child,
+            bottomNavigationBar: wide
+                ? null
+                : NavigationBar(
+                    onDestinationSelected: tabsRouter.setActiveIndex,
+                    selectedIndex: tabsRouter.activeIndex,
+                    destinations: [
+                      for (final d in _destinations)
+                        NavigationDestination(
+                          selectedIcon: Icon(d.selected),
+                          icon: Icon(d.icon),
+                          label: d.label,
+                        ),
+                    ],
+                  ),
+          );
+        },
+      ),
     );
   }
 }

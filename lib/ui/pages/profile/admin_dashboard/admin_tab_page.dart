@@ -15,6 +15,7 @@ import 'package:flashcards/ui/theme/theme_extensions.dart';
 import 'package:flashcards/ui/widgets/search/core_widgets/filter_drawer.dart';
 import 'package:flashcards/ui/widgets/search/search_page/pack_search_page/pack_filter_options.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flashcards/ui/pages/profile/admin_dashboard/app_update_admin_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flashcards/l10n/app_localizations.dart';
@@ -212,6 +213,19 @@ class _AdminTabPageState extends State<AdminTabPage> with AutoRouteAware {
                       title: "All Packs (without search)",
                       icon: Icons.folder_copy_outlined,
                       selectedIcon: Icons.folder_copy,
+                    ),
+                    _DrawerItem(
+                      index: -2,
+                      onTap: () {
+                        Navigator.of(drawerContext).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const AppUpdateAdminPage(),
+                          ),
+                        );
+                      },
+                      title: "App update notice",
+                      icon: Icons.system_update_outlined,
                     ),
                     Divider(height: 5),
                     _DrawerItem(
