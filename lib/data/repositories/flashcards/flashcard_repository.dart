@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart' show FirebaseFunctionsException;
 import 'package:flashcards/data/services/api/dto/flashcards/custom_session/flashcard_ids/flashcard_ids_patch/flashcard_ids_patch_dto.dart';
 import 'package:flashcards/data/services/api/dto/flashcards/fcp_data/fcp_data_dto.dart';
 import 'package:flashcards/data/remote/cloud_function_service.dart';
@@ -619,6 +620,80 @@ class FlashcardRepository {
       );
     }
     return Result.ok(null);
+  }
+
+  /// Cards changed per request by [bulkUpdateTags].
+  static const bulkChunk = 400;
+
+  /// Adds and removes tags on many cards with a few server requests (400
+  /// cards each) instead of one per card. Null when the server doesn't
+  /// have the bulk change yet (functions not deployed): change the cards
+  /// one by one instead.
+  Future<({int updated, int failed})?> bulkUpdateTags({
+    required List<Flashcard> cards,
+    List<Tag> add = const [],
+    List<Tag> remove = const [],
+    required List<Tag> allAvailableTags,
+    void Function(int finished, int total)? onProgress,
+  }) async {
+    onProgress?.call(0, cards.length);
+    if (cards.isEmpty) return (updated: 0, failed: 0);
+    // A new tag is created once.
+    final newTags = add.findNewTags(allAvailableTags);
+    if (newTags.isNotEmpty) {
+      final created = await _tagService.setDocuments(
+        add.findNewTagsDto(allAvailableTags),
+      );
+      if (created case Error<void>()) {
+        return (updated: 0, failed: cards.length);
+      }
+      _tagCache.insertAll(0, newTags);
+    }
+
+    final addIds = add.toIdList();
+    final removeIds = remove.toIdList();
+    var updated = 0;
+    var failed = 0;
+    var finished = 0;
+    for (var i = 0; i < cards.length; i += bulkChunk) {
+      final chunk = cards.skip(i).take(bulkChunk).toList();
+      try {
+        final changed = (await _flashcardService.bulkUpdateCardTags(
+          flashcardIds: chunk.map((c) => c.id).toList(),
+          addTags: addIds,
+          removeTags: removeIds,
+        )).toSet();
+        updated += changed.length;
+        for (final card in chunk) {
+          if (!changed.contains(card.id)) continue;
+          final before = card.tags.toIdList();
+          final after = [
+            for (final id in [...before, ...addIds])
+              if (!removeIds.contains(id)) id,
+          ].toSet().toList();
+          try {
+            _handleFlashcardTagsUpdatedInCache(
+              packId: card.packId,
+              oldTags: before,
+              newTags: after,
+            );
+          } catch (_) {
+            // The cached counts are refreshed with the pack.
+          }
+        }
+        for (final packId in chunk.map((c) => c.packId).toSet()) {
+          _adminPageCache.invalidate(packId);
+        }
+      } on FirebaseFunctionsException catch (error) {
+        if (error.code == 'not-found' && i == 0) return null;
+        failed += chunk.length;
+      } on Exception {
+        failed += chunk.length;
+      }
+      finished += chunk.length;
+      onProgress?.call(finished, cards.length);
+    }
+    return (updated: updated, failed: failed);
   }
 
   Future<Result<void>> createFlashcardAndAssignToPack({

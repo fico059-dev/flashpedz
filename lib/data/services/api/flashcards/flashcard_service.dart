@@ -90,10 +90,9 @@ class FlashcardService {
         query = query.startAfterDocument(startAfter);
       }
       final snapshot = await query.get();
-      final dtoList =
-          snapshot.docs
-              .map((doc) => FlashcardDto.fromJsonWithId(doc.data(), doc.id))
-              .toList();
+      final dtoList = snapshot.docs
+          .map((doc) => FlashcardDto.fromJsonWithId(doc.data(), doc.id))
+          .toList();
 
       return Result.ok(
         PaginatedDtoResult(
@@ -112,10 +111,9 @@ class FlashcardService {
     try {
       final query = _flashcards.where('packId', isEqualTo: packId);
       await for (final snapshot in query.snapshots()) {
-        final flashcards =
-            snapshot.docs
-                .map((doc) => FlashcardDto.fromJsonWithId(doc.data(), doc.id))
-                .toList();
+        final flashcards = snapshot.docs
+            .map((doc) => FlashcardDto.fromJsonWithId(doc.data(), doc.id))
+            .toList();
         yield Result.ok(flashcards);
       }
     } on Exception catch (error) {
@@ -173,11 +171,24 @@ class FlashcardService {
     }
   }
 
+  /// Adds and removes tags on many cards in one request (at most 400).
+  /// Returns the ids of the cards that changed.
+  Future<List<String>> bulkUpdateCardTags({
+    required List<String> flashcardIds,
+    List<String> addTags = const [],
+    List<String> removeTags = const [],
+  }) => _functions.bulkUpdateCardTags(
+    flashcardIds: flashcardIds,
+    addTags: addTags,
+    removeTags: removeTags,
+  );
+
   /// Returns the question of every flashcard in the pack.
   Future<Result<Set<String>>> getQuestionsInPack(String packId) async {
     try {
-      final snapshot =
-          await _flashcards.where('packId', isEqualTo: packId).get();
+      final snapshot = await _flashcards
+          .where('packId', isEqualTo: packId)
+          .get();
       return Result.ok(
         snapshot.docs.map((doc) => doc.data()['question'] as String).toSet(),
       );

@@ -48,10 +48,20 @@ class PackCardBulkActions {
     Tag tag, {
     void Function(int finished, int total)? onProgress,
   }) async {
-    final todo = cards.where((c) => !c.tags.any((t) => t.id == tag.id));
+    final todo = cards
+        .where((c) => !c.tags.any((t) => t.id == tag.id))
+        .toList();
     final allTags = await _allTags();
+    final fast = await _flashcardRepo.bulkUpdateTags(
+      cards: todo,
+      add: [tag],
+      allAvailableTags: allTags,
+      onProgress: onProgress,
+    );
+    if (fast != null) return _outcome(cards.length, fast);
+    // Older server: one card at a time.
     final outcome = await _run(
-      todo.toList(),
+      todo,
       (card) => _flashcardRepo.updateFlashcardEverywhere(
         packId: card.packId,
         flashcardId: card.id,
@@ -76,10 +86,18 @@ class PackCardBulkActions {
     Tag tag, {
     void Function(int finished, int total)? onProgress,
   }) async {
-    final todo = cards.where((c) => c.tags.any((t) => t.id == tag.id));
+    final todo = cards.where((c) => c.tags.any((t) => t.id == tag.id)).toList();
     final allTags = await _allTags();
+    final fast = await _flashcardRepo.bulkUpdateTags(
+      cards: todo,
+      remove: [tag],
+      allAvailableTags: allTags,
+      onProgress: onProgress,
+    );
+    if (fast != null) return _outcome(cards.length, fast);
+    // Older server: one card at a time.
     final outcome = await _run(
-      todo.toList(),
+      todo,
       (card) => _flashcardRepo.updateFlashcardEverywhere(
         packId: card.packId,
         flashcardId: card.id,
@@ -95,6 +113,13 @@ class PackCardBulkActions {
       skipped: cards.length - todo.length,
     );
   }
+
+  static BulkOutcome _outcome(int total, ({int updated, int failed}) result) =>
+      BulkOutcome(
+        done: result.updated,
+        failed: result.failed,
+        skipped: total - result.updated - result.failed,
+      );
 
   Future<List<Tag>> _allTags() async {
     final result = await _tagRepo.getAllTags();

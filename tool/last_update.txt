@@ -1,1 +1,1 @@
-FlashPedz update: 10 Nov 2026 - Update available notice (admin dashboard: App update notice). App version 1.1.4 (159).
+FlashPedz update: 11 Nov 2026 - Bulk add/remove tags in the pack editor: one request per 400 cards. Also: update available notice (10 Nov).

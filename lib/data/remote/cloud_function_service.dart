@@ -293,6 +293,27 @@ class CloudFunctionService {
     await callable.call(data);
   }
 
+  /// Adds and removes tags on up to 400 cards in one request. Returns the
+  /// ids of the cards that changed.
+  Future<List<String>> bulkUpdateCardTags({
+    required List<String> flashcardIds,
+    List<String> addTags = const [],
+    List<String> removeTags = const [],
+  }) async {
+    final result = await _functions
+        .httpsCallable(
+          'bulkUpdateCardTags',
+          options: HttpsCallableOptions(timeout: const Duration(minutes: 5)),
+        )
+        .call(<String, dynamic>{
+          'flashcardIds': flashcardIds,
+          'addTags': addTags,
+          'removeTags': removeTags,
+        });
+    final data = Map<String, dynamic>.from(result.data as Map);
+    return [for (final id in data['updated'] as List) id as String];
+  }
+
   Future<void> renamePackEverywhere(String packId, String packName) async {
     final callable = _functions.httpsCallable('renamePackEverywhere');
     await callable.call(<String, dynamic>{

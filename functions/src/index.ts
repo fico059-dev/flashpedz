@@ -16,6 +16,7 @@ import {deletePackProgressHandler} from "./handlers/deletePackProgress";
 import {renamePackEverywhereHandler} from "./handlers/renamePackEverywhere";
 import {deleteFlashcardEverywhereHandler} from "./handlers/deleteFlashcardEverywhere";
 import {updateFlashcardEverywhereHandler} from "./handlers/updateFlashcardEverywhere";
+import {bulkUpdateCardTagsHandler} from "./handlers/bulkUpdateCardTags";
 import {
   countCustomSessionCardsHandler,
   createCustomSessionHandler,
@@ -82,6 +83,10 @@ export const deleteFlashcardEverywhere = onCall(
 );
 export const updateFlashcardEverywhere = onCall(
   updateFlashcardEverywhereHandler,
+);
+export const bulkUpdateCardTags = onCall(
+  {memory: "512MiB", timeoutSeconds: 300},
+  bulkUpdateCardTagsHandler,
 );
 
 // fcp_data operations

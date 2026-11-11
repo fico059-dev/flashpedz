@@ -43,6 +43,35 @@ class _FakeCards implements FlashcardRepository {
     return Result.ok(null);
   }
 
+  /// The fast way: all the cards in one request.
+  @override
+  Future<({int updated, int failed})?> bulkUpdateTags({
+    required List<Flashcard> cards,
+    List<Tag> add = const [],
+    List<Tag> remove = const [],
+    required List<Tag> allAvailableTags,
+    void Function(int finished, int total)? onProgress,
+  }) async {
+    bulkRequests++;
+    final removeIds = remove.map((t) => t.id).toSet();
+    for (final card in cards) {
+      final tags = [
+        for (final t in [...card.tags, ...add])
+          if (!removeIds.contains(t.id)) t,
+      ];
+      await updateFlashcardEverywhere(
+        packId: card.packId,
+        flashcardId: card.id,
+        allAvailableTags: allAvailableTags,
+        selectedTags: {for (final t in tags) t.id: t}.values.toList(),
+      );
+    }
+    onProgress?.call(cards.length, cards.length);
+    return (updated: cards.length, failed: 0);
+  }
+
+  int bulkRequests = 0;
+
   @override
   Future<Result<void>> deleteFlashcardEverywhere(Flashcard flashcard) async {
     deleted.add(flashcard.id);
@@ -133,6 +162,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repo.updates.keys.toSet(), {'1', '2', '3'});
+    // One request for all of them.
+    expect(repo.bulkRequests, 1);
     expect(repo.updates['2'], contains(Tag.fromName('Board review').id));
     expect(find.textContaining('3 tagged'), findsOneWidget);
     expect(find.textContaining('#Board'), findsNWidgets(3));
